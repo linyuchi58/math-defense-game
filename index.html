@@ -1,0 +1,2584 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星際防禦：心算雷射戰 v2.0</title>
+    <style>
+        html, body, #app { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; outline: none; }
+        body { background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%); color: #333; }
+        .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; box-sizing: border-box; }
+        .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #game-screen.active { display: flex !important; flex-direction: column; width: 100%; height: 100%; justify-content: space-between; overflow: hidden; background: #070b19; }
+        button { cursor: pointer; border: none; outline: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.08s, filter 0.1s; font-family: inherit; }
+        button:active { transform: scale(0.95); filter: brightness(0.9); }
+        button.disabled, button:disabled { filter: grayscale(1) brightness(0.6); cursor: not-allowed; pointer-events: none; }
+
+        #hud { flex: 0 0 auto; min-height: 72px; display: flex; width: 100%; padding: 6px 14px; box-sizing: border-box; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #0f2027, #203a43, #2c5364); box-shadow: 0 4px 15px rgba(0,255,255,0.25); z-index: 5; border-bottom: 3px solid #00d2ff; color: #fff; gap: 8px; flex-wrap: wrap; }
+        #hud.urgent .time-box { color: #ff7675; animation: pulse 0.9s infinite; }
+        #hud.double-fever { border-bottom-color: #f1c40f; box-shadow: 0 4px 25px rgba(241,196,15,0.6); background: linear-gradient(90deg, #4b134f, #c94b4b); }
+        .hud-left { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 12px; border: 1px solid rgba(0,210,255,0.45); }
+        .time-box { font-size: clamp(15px, 2.2vw, 20px); font-weight: 900; color: #00ffcc; white-space: nowrap; }
+        .progress-wrapper { display: flex; flex-direction: column; gap: 3px; min-width: clamp(130px, 20vw, 220px); }
+        .progress-label { display: flex; justify-content: space-between; font-size: clamp(12px, 1.6vw, 15px); font-weight: 900; color: #f1c40f; }
+        .progress-bar-bg { width: 100%; height: 12px; background: rgba(255,255,255,0.18); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); }
+        #progress-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #00b894, #00ffcc, #f1c40f); transition: width 0.3s; }
+
+        .aim-box { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; min-width: 150px; }
+        #answer-screen { min-width: clamp(125px, 22vw, 195px); height: 46px; background: #000; border: 3px solid #00ffcc; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: clamp(22px, 3.8vw, 32px); font-weight: 900; color: #00ffcc; font-family: 'Courier New', monospace; letter-spacing: 2px; box-shadow: 0 0 15px rgba(0,255,204,0.4); padding: 0 14px; }
+        #answer-screen.jammed { border-color: #ff3838; color: #ff3838; background: #2b0000; animation: shake 0.3s; }
+        @keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+        .combo-badge { display: none; background: linear-gradient(45deg, #ff416c, #ff4b2b); color: white; padding: 4px 10px; border-radius: 20px; font-weight: 900; font-size: clamp(13px, 2vw, 17px); border: 2px solid #fff; white-space: nowrap; }
+
+        .hud-right { display: flex; align-items: center; gap: 6px; }
+        .skill-badge { padding: 5px 10px; border-radius: 16px; font-weight: 900; font-size: clamp(13px, 1.8vw, 16px); color: #fff; border: 2px solid #fff; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+        .skill-freeze { background: linear-gradient(to bottom, #0984e3, #00cec9); box-shadow: 0 3px 0 #0652dd; }
+        .skill-double { background: linear-gradient(to bottom, #f39c12, #d35400); box-shadow: 0 3px 0 #a04000; }
+        .skill-badge.active { animation: pulse 1.1s infinite; }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); filter: brightness(1.15); } }
+        .icon-circle-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.92); font-size: 17px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #2c3e50; flex-shrink: 0; }
+
+        #canvas-container { flex: 1 1 0%; min-height: 0; position: relative; width: 100%; display: flex; justify-content: center; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #controls { flex: 0 0 auto; padding: 6px 10px 8px 10px; background: linear-gradient(to bottom, rgba(15,32,39,0.96), rgba(9,10,15,0.99)); display: flex; justify-content: center; align-items: center; width: 100%; box-sizing: border-box; z-index: 5; border-top: 2px solid rgba(0,210,255,0.35); }
+        #numpad-grid { display: grid; grid-template-columns: repeat(7, minmax(44px, 92px)); grid-template-rows: repeat(2, clamp(44px, 7.5vh, 60px)); gap: 7px; justify-content: center; width: 100%; max-width: 700px; }
+        .num-btn { width: 100%; height: 100%; font-size: clamp(21px, 3.8vw, 28px); font-weight: 900; border-radius: 10px; background: linear-gradient(to bottom, #ffffff, #dfe6e9); color: #1e272e; box-shadow: 0 4px 0 #7f8c8d; display: flex; align-items: center; justify-content: center; }
+        .num-btn:active, .num-btn.key-pressed { transform: translateY(3px); box-shadow: 0 1px 0 #7f8c8d; background: #00ffcc; color: #000; }
+        .num-btn.btn-clear { background: linear-gradient(to bottom, #ff7675, #d63031); color: #fff; box-shadow: 0 4px 0 #901a1e; font-size: clamp(15px, 2.6vw, 19px); }
+        .num-btn.btn-fire { background: linear-gradient(to bottom, #00b894, #00cec9); color: #fff; box-shadow: 0 4px 0 #00796b; font-size: clamp(15px, 2.6vw, 19px); }
+        .num-btn.btn-skill-ice { background: linear-gradient(to bottom, #74b9ff, #0984e3); color: #fff; box-shadow: 0 4px 0 #0652dd; font-size: clamp(13px, 2.2vw, 17px); border: 2px solid #fff; }
+
+        #home-screen { overflow-y: auto; padding: 15px; }
+        .home-card { position: relative; background: rgba(255,255,255,0.96); padding: 22px 24px; border-radius: 22px; box-shadow: 0 15px 40px rgba(0,210,255,0.3); width: 94%; max-width: 530px; border: 4px solid #00d2ff; box-sizing: border-box; user-select: auto; }
+        .fullscreen-top-btn { position: absolute; top: 14px; right: 14px; background: #ecf0f1; color: #2c3e50; padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: 900; border: 1px solid #bdc3c7; }
+        .login-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f1f6f9; padding: 14px; border-radius: 15px; border: 2px solid #d2e3fc; margin-bottom: 12px; text-align: left; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-group label { font-size: 14px; font-weight: 900; color: #2c3e50; }
+        .form-group input { width: 100%; box-sizing: border-box; padding: 9px; font-size: 18px; font-weight: bold; border: 2px solid #bdc3c7; border-radius: 8px; text-align: center; outline: none; background: #fff; }
+
+        .mode-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .mode-btn { background: #f1f6f9; color: #2c3e50; border: 3px solid #d2e3fc; border-radius: 14px; padding: 9px 6px; font-size: 16px; font-weight: 900; box-shadow: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .mode-btn small { font-size: 11.5px; font-weight: bold; color: #7f8c8d; }
+        .mode-btn.on { background: linear-gradient(to bottom, #0984e3, #00a8ff); color: #fff; border-color: #0652dd; box-shadow: 0 3px 0 #0652dd; }
+        .mode-btn.on small { color: #e8f4ff; }
+        .app-version { margin-top: 8px; font-size: 12px; color: #95a5a6; font-weight: bold; }
+        #relay-next-modal .small-modal-card { border-color: #f39c12; }
+        .relay-rank { width: 100%; border-collapse: collapse; margin: 8px 0 0; font-size: 14px; min-width: 0; }
+        .relay-rank td, .relay-rank th { border: 1px solid #eee; padding: 5px 8px; }
+        .relay-rank th { background: #ffeaa7; position: static; }
+        #relay-box { display: none; background: #fff8e1; border: 2px solid #f39c12; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; text-align: left; }
+        #newtab-promo-box { background: #fff8e1; border: 2px dashed #f39c12; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+        .btn-newtab-gold { width: 100%; background: linear-gradient(to bottom, #f39c12, #e67e22); color: #fff; font-size: 17px; font-weight: 900; padding: 10px 14px; border-radius: 10px; box-shadow: 0 4px 0 #b95800; border: 2px solid #fff; margin-bottom: 5px; }
+
+        #settings-screen { overflow-y: auto; justify-content: flex-start !important; padding: 20px 10px 45px 10px; user-select: auto; background: #f0f4f8; color: #2d3436; }
+        #settings-screen > * { flex-shrink: 0; }
+        .admin-header-bar { display: flex; justify-content: space-between; align-items: center; width: 96%; max-width: 960px; background: #fff; padding: 12px 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 14px; flex-wrap: wrap; gap: 10px; box-sizing: border-box; border-left: 6px solid #0984e3; }
+        .admin-nav { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; width: 96%; max-width: 960px; }
+        .tab-btn { padding: 10px 20px; font-size: 16px; font-weight: 900; border-radius: 10px; background: #dfe6e9; color: #2d3436; }
+        .tab-btn.active { background: #0984e3; color: white; box-shadow: 0 4px 0 #0652dd; }
+        .admin-panel { display: none; width: 96%; max-width: 960px; flex-direction: column; align-items: center; }
+        .admin-panel.active { display: flex; }
+        .admin-box { width: 100%; background: #fff; padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 16px; box-sizing: border-box; text-align: left; }
+        .admin-box h3 { margin: 0 0 12px 0; color: #2c3e50; font-size: 18px; border-bottom: 2px solid #f1f2f6; padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+        .preset-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .preset-btn { background: #e8f4f8; color: #0984e3; border: 2px solid #74b9ff; padding: 7px 13px; border-radius: 8px; font-weight: 900; font-size: 14px; box-shadow: none; }
+        .preset-btn:hover { background: #0984e3; color: #fff; }
+        .slider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+        .slider-card { background: #f8f9fa; padding: 12px 14px; border-radius: 10px; border: 1px solid #e9ecef; }
+        .slider-card label { font-weight: 900; font-size: 14px; color: #2c3e50; display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .slider-card input[type="range"] { width: 100%; accent-color: #0984e3; cursor: pointer; }
+        .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; width: 100%; }
+        @media (max-width: 600px) { .module-grid { grid-template-columns: 1fr; } }
+        .module-card { background: #fff; border: 2px solid #dfe6e9; border-radius: 14px; padding: 15px; box-sizing: border-box; text-align: left; }
+        .module-card.enabled { border-color: #00b894; background: #f9fffd; }
+        .module-title { font-size: 17px; font-weight: 900; color: #2d3436; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+        .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .num-chip { padding: 5px 11px; border-radius: 8px; background: #ecf0f1; color: #2c3e50; font-weight: 900; font-size: 14px; cursor: pointer; border: 2px solid #bdc3c7; }
+        .num-chip.selected { background: #00b894; color: #fff; border-color: #00897b; }
+        .preview-board { background: #1e272e; color: #00ffcc; padding: 14px 18px; border-radius: 12px; font-family: 'Courier New', monospace; font-weight: bold; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; border: 3px solid #485460; margin-top: 10px; }
+        .preview-item { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 8px; font-size: 15px; color: #fff; }
+        .preview-item span { color: #f1c40f; }
+
+        .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+        .filter-bar input, .filter-bar select { padding: 8px 10px; font-size: 15px; border: 2px solid #bdc3c7; border-radius: 6px; font-weight: bold; }
+        .table-container { width: 100%; overflow-x: auto; background: #fff; border-radius: 10px; border: 1px solid #dfe6e9; max-height: 400px; overflow-y: auto; }
+        table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+        th, td { border: 1px solid #e9ecef; padding: 8px 10px; text-align: center; }
+        th { background: #f6d365; color: #2d3436; position: sticky; top: 0; z-index: 2; font-weight: 900; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        tr.highlight-me { background: #d4efdf !important; font-weight: 900; }
+
+        .diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .diag-stat-card { background: #f8f9fa; border-left: 5px solid #0984e3; padding: 10px 14px; border-radius: 8px; text-align: left; }
+        .diag-stat-card .title { font-size: 13px; color: #636e72; font-weight: bold; }
+        .diag-stat-card .val { font-size: 22px; font-weight: 900; color: #2d3436; margin-top: 2px; }
+        .diag-section { background: #fff; border: 1px solid #dfe6e9; border-radius: 10px; padding: 12px 15px; margin-bottom: 12px; text-align: left; }
+        .diag-section h4 { margin: 0 0 8px 0; color: #2c3e50; font-size: 16px; border-bottom: 2px solid #f1f2f6; padding-bottom: 5px; }
+        .bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; font-weight: bold; }
+        .bar-bg { flex: 1; height: 14px; background: #ecf0f1; border-radius: 7px; overflow: hidden; }
+        .bar-fill { height: 100%; background: linear-gradient(90deg, #ff7675, #d63031); border-radius: 7px; }
+
+        #result-screen { overflow-y: auto; justify-content: flex-start !important; padding: 20px 10px; }
+        .result-card { background: rgba(255,255,255,0.96); padding: 20px 25px; border-radius: 22px; box-shadow: 0 12px 30px rgba(0,0,0,0.4); width: 95%; max-width: 780px; border: 4px solid #f1c40f; box-sizing: border-box; margin-bottom: 20px; }
+        .score-summary { display: flex; flex-wrap: wrap; justify-content: space-around; align-items: center; background: #fdfefe; padding: 12px 15px; border-radius: 14px; border: 2px solid #ecf0f1; margin-bottom: 12px; gap: 10px; }
+        .bonus-breakdown { background: #e8f8f5; border: 2px solid #00b894; color: #006266; padding: 8px 14px; border-radius: 10px; font-size: 14px; font-weight: 900; margin-bottom: 12px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .board-box { background: #fff; border-radius: 12px; border: 2px solid #bdc3c7; overflow: hidden; margin-top: 10px; }
+        .board-header { background: linear-gradient(90deg, #0984e3, #00cec9); color: white; padding: 10px 15px; font-size: 17px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .board-scroll { max-height: 250px; overflow-y: auto; }
+
+        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.82); flex-direction:column; justify-content:center; align-items:center; z-index: 50; color: white; }
+        .modal-card { background: #fff; color: #333; padding: 22px; border-radius: 18px; width: 94%; max-width: 820px; max-height: 90%; display: flex; flex-direction: column; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .small-modal-card { background: #fff; color: #333; padding: 24px; border-radius: 18px; width: 92%; max-width: 480px; text-align: center; box-sizing: border-box; box-shadow: 0 12px 35px rgba(0,0,0,0.5); border: 4px solid #0984e3; max-height: 92vh; overflow-y: auto; }
+        .rec-code-badge, .suggest-chip { display: inline-block; background: #e8f8f5; color: #00b894; border: 2px solid #00b894; padding: 4px 10px; border-radius: 8px; font-weight: 900; margin: 3px; cursor: pointer; font-size: 13.5px; }
+        .rec-code-badge:hover, .suggest-chip:hover { filter: brightness(0.95); transform: translateY(-1px); }
+        #penalty-warning { display: none; position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); max-width: 92%; color: #c0392b; font-size: clamp(18px, 3.2vw, 25px); font-weight: 900; background: rgba(255,255,255,0.97); padding: 12px 24px; border-radius: 15px; text-align: center; box-shadow: 0 0 25px rgba(255,0,0,0.8); border: 4px solid #e74c3c; z-index: 8; pointer-events: none; }
+        @media (max-width: 680px) {
+            #hud { padding: 4px 8px; gap: 4px; min-height: 0; }
+            .hud-left { order: 1; flex: 1 1 auto; padding: 4px 8px; gap: 6px; }
+            .hud-right { order: 2; gap: 4px; }
+            .aim-box { order: 3; flex: 1 1 100%; min-width: 0; }
+            .progress-wrapper { min-width: 0; flex: 1; }
+            .icon-circle-btn { width: 32px; height: 32px; font-size: 15px; }
+            .skill-badge { padding: 4px 7px; font-size: 12.5px; }
+            #answer-screen { height: 40px; }
+        }
+        @media (max-width: 430px) {
+            #rank-display { display: none; }
+            .skill-badge { font-size: 0; gap: 0; }
+            .skill-badge > span { font-size: 12px; }
+            #freeze-badge::before { content: '❄️'; font-size: 14px; }
+            #double-badge::before { content: '🔥'; font-size: 14px; }
+            #voice-toggle-btn { display: none; }
+        }
+        @media (max-height: 520px) and (min-width: 560px) {
+            #hud { min-height: 0; padding: 3px 10px; flex-wrap: nowrap; }
+            #rank-display, #voice-toggle-btn { display: none; }
+            .progress-wrapper { min-width: 110px; }
+            .skill-badge { font-size: 0; gap: 0; padding: 4px 7px; }
+            .skill-badge > span { font-size: 12px; }
+            #freeze-badge::before { content: '❄️'; font-size: 14px; }
+            #double-badge::before { content: '🔥'; font-size: 14px; }
+            .icon-circle-btn { width: 30px; height: 30px; font-size: 14px; }
+            .aim-box { min-width: 120px; }
+            #answer-screen { height: 36px; }
+            #numpad-grid { grid-template-rows: repeat(2, clamp(36px, 9vh, 48px)); }
+            #controls { padding: 3px 8px 4px; }
+        }
+        #toast-msg { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 184, 148, 0.96); color: white; padding: 12px 24px; border-radius: 12px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4); z-index: 200; }
+
+        .btn-primary { font-size: 20px; padding: 11px 24px; border-radius: 12px; background: linear-gradient(to bottom, #00b894, #009432); color: white; font-weight: 900; margin: 5px; box-shadow: 0 4px 0 #006266; }
+        .btn-secondary { font-size: 15px; padding: 9px 16px; border-radius: 10px; background: linear-gradient(to bottom, #0984e3, #0652dd); color: white; font-weight: bold; margin: 4px; box-shadow: 0 3px 0 #1b1464; }
+        .btn-warning { font-size: 15px; padding: 9px 16px; border-radius: 10px; background: linear-gradient(to bottom, #f39c12, #d68910); color: white; font-weight: bold; margin: 4px; box-shadow: 0 3px 0 #9a7d0a; }
+        .btn-purple { font-size: 15px; padding: 9px 16px; border-radius: 10px; background: linear-gradient(to bottom, #9b59b6, #8e44ad); color: white; font-weight: 900; margin: 4px; box-shadow: 0 3px 0 #5b2c6f; }
+        .btn-danger { background: #e74c3c; color: white; padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: bold; }
+    </style>
+</head>
+<body tabindex="0">
+    <div id="toast-msg"></div>
+    <div id="app">
+        <!-- 1. 首頁 -->
+        <div id="home-screen" class="screen active">
+            <div class="home-card">
+                <button class="fullscreen-top-btn" onclick="toggleFullScreen()">⛶ 全螢幕</button>
+                <h1 style="font-size: clamp(25px, 5vw, 36px); margin: 6px 0 4px 0; color: #0984e3; text-shadow: 2px 2px 0 #dfe6e9;">🚀 星際防禦：心算雷射戰</h1>
+                <div id="home-subtitle" style="font-size: 15px; font-weight: 900; color: #00b894; margin-bottom: 12px;">【達標過關助學版・5位數雲端分流榮譽榜】</div>
+
+                <div class="mode-seg" role="group" aria-label="遊戲模式">
+                    <button id="mode-btn-solo" class="mode-btn on" onclick="setPlayMode('solo')">🧑‍💻 各自練習<small>每人一台平板／電腦</small></button>
+                    <button id="mode-btn-relay" class="mode-btn" onclick="setPlayMode('relay')">🏁 大螢幕輪流接力<small>一位一位上台打怪</small></button>
+                </div>
+                <div class="login-form">
+                    <div class="form-group">
+                        <label>🔑 5位數挑戰代碼 <span style="font-weight:normal; color:#7f8c8d;">(公開00000)</span></label>
+                        <input type="text" id="login-code" value="00000" maxlength="5" placeholder="例如: 52011" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    </div>
+                    <div class="form-group">
+                        <label>🔢 座號 <span style="font-weight:normal; color:#7f8c8d;">(選填)</span></label>
+                        <input type="text" id="login-seat" placeholder="例如: 05" maxlength="5">
+                    </div>
+                    <div class="form-group full">
+                        <label>👤 姓名或暱稱 <span style="color:#e74c3c;">*必填</span></label>
+                        <input type="text" id="login-name" placeholder="請輸入您的姓名或星際代號" maxlength="12">
+                    </div>
+                </div>
+
+                <!-- 📱 平板 / iPad 100% 滿版新分頁啟動專區 -->
+                <div id="newtab-promo-box">
+                    <button class="btn-newtab-gold" onclick="openInNewFullTab()">🚀 點此在新分頁 100% 滿版開啟遊戲 (iPad / 平板強烈推薦！)</button>
+                    <div style="font-size: 12.5px; color: #b95800; font-weight: bold; line-height: 1.4;">
+                        💡 若使用 iPad、平板或發現畫面顯示不完整，請先點上方橘色按鈕開啟獨立滿版視窗（已輸入的代碼與姓名會自動帶過去喔！）
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 8px;">
+                    <button id="start-btn" class="btn-primary" onclick="startCloudGame()" style="width: 100%; font-size: 21px; margin: 2px 0 6px 0;">▶️ 載入心算任務並發射升空</button>
+                    <button class="btn-warning" onclick="openHomeLeaderboard()">🏆 查看代碼排行榜</button>
+                    <button class="btn-secondary" onclick="openTeacherStep1Modal()" style="background: #636e72; box-shadow: 0 3px 0 #2d3436;">⚙️ 教師管理 / 雲端命題</button>
+                </div>
+                <div style="font-size: 12.5px; color: #555; font-weight: bold;">💡 支援電腦實體數字鍵盤 ＆ 平板內建太空觸控鍵盤！累積滿目標分數即過關！</div>
+                <div class="app-version" title="v2.0：iPad 120Hz 速度修正、畫面更清晰、開場倒數、模糊答案不誤判、輪流接力、提早結算、代碼公開區、唸題">🚀 星際防禦：心算雷射戰 v2.0</div>
+            </div>
+        </div>
+
+        <!-- 🔐 教師驗證視窗 1：輸入專屬教師通行碼 -->
+        <div id="teacher-login-modal" class="overlay">
+            <div class="small-modal-card">
+                <h2 style="margin:0 0 10px 0; color:#2c3e50;">👩‍🏫 教師身分驗證</h2>
+                <p style="font-size:15px; color:#2c3e50; font-weight:bold; margin:0 0 14px 0;">
+                    請輸入您的教師專屬通行碼：
+                </p>
+                <input type="password" id="teacher-pin-modal-input" placeholder="請輸入教師專屬通行碼" style="width:100%; box-sizing:border-box; padding:10px; font-size:20px; text-align:center; border:2px solid #0984e3; border-radius:8px; margin-bottom:15px; font-weight:bold;" onkeydown="if(event.key==='Enter') verifyTeacherStep1()">
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    <button class="btn-secondary" onclick="closeTeacherModal()" style="background:#95a5a6;">取消</button>
+                    <button class="btn-primary" onclick="verifyTeacherStep1()" style="font-size:16px; padding:9px 22px; margin:0;">下一步 ➔</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🔐 教師驗證視窗 2：5組額度控管、建立新代碼與維護現有代碼 -->
+        <div id="teacher-room-modal" class="overlay">
+            <div class="small-modal-card">
+                <h2 style="margin:0 0 10px 0; color:#2c3e50;">🛠️ 班級挑戰代碼管理</h2>
+                <!-- 動態額度與已建立代碼橫幅會自動插入於此 h2 下方 -->
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <button id="tab-room-mode-create" class="tab-btn active" onclick="switchRoomModalMode('create')" style="flex:1; padding:8px 10px; font-size:14px;">✨ 建立新挑戰代碼</button>
+                    <button id="tab-room-mode-maintain" class="tab-btn" onclick="switchRoomModalMode('maintain')" style="flex:1; padding:8px 10px; font-size:14px;">🛠️ 維護現有代碼</button>
+                </div>
+
+                <!-- 建立新代碼面板 -->
+                <div id="room-modal-create-panel" style="display:block;">
+                    <div id="recommended-codes-box" style="background:#f1f9f7; padding:10px; border-radius:10px; border:1px dashed #00b894; margin-bottom:12px; font-size:13px; color:#2d3436;">☁️ 正在掃描雲端可用代碼...</div>
+                    <div style="text-align:left; margin-bottom:10px;">
+                        <label style="font-weight:900; font-size:14px;">🔑 設定 5 位數挑戰代碼 (不可為 00000)：</label>
+                        <input type="text" id="create-room-code-input" maxlength="5" placeholder="例如: 52011" oninput="this.value=this.value.replace(/[^0-9]/g,'')" style="width:100%; box-sizing:border-box; padding:9px; font-size:20px; text-align:center; border:2px solid #00b894; border-radius:8px; font-weight:bold; margin-top:4px;">
+                    </div>
+                    <div style="text-align:left; margin-bottom:15px;">
+                        <label style="font-weight:900; font-size:14px;">🔐 設定此代碼的管理密碼 <span style="color:#e74c3c;">*必填</span>：</label>
+                        <input type="password" id="create-room-pin-input" maxlength="10" placeholder="下次維護時需輸入此密碼" style="width:100%; box-sizing:border-box; padding:9px; font-size:18px; text-align:center; border:2px solid #bdc3c7; border-radius:8px; font-weight:bold; margin-top:4px;" onkeydown="if(event.key==='Enter') submitCreateRoom()">
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button class="btn-secondary" onclick="closeTeacherModal()" style="background:#95a5a6;">關閉</button>
+                        <button id="btn-submit-create-room" class="btn-primary" onclick="submitCreateRoom()" style="font-size:16px; padding:9px 20px; margin:0;">✨ 建立代碼並進入後台</button>
+                    </div>
+                </div>
+
+                <!-- 維護現有代碼面板 -->
+                <div id="room-modal-maintain-panel" style="display:none;">
+                    <div style="text-align:left; margin-bottom:10px;">
+                        <label style="font-weight:900; font-size:14px;">🔑 輸入您建立的 5 位數挑戰代碼：</label>
+                        <input type="text" id="maintain-room-code-input" maxlength="5" placeholder="例如: 52011" oninput="this.value=this.value.replace(/[^0-9]/g,'')" style="width:100%; box-sizing:border-box; padding:9px; font-size:20px; text-align:center; border:2px solid #0984e3; border-radius:8px; font-weight:bold; margin-top:4px;">
+                    </div>
+                    <div style="text-align:left; margin-bottom:15px;">
+                        <label style="font-weight:900; font-size:14px;">🔐 輸入該代碼的管理密碼：</label>
+                        <input type="password" id="maintain-room-pin-input" maxlength="10" placeholder="請輸入管理密碼" style="width:100%; box-sizing:border-box; padding:9px; font-size:18px; text-align:center; border:2px solid #bdc3c7; border-radius:8px; font-weight:bold; margin-top:4px;" onkeydown="if(event.key==='Enter') submitMaintainRoom()">
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button class="btn-secondary" onclick="closeTeacherModal()" style="background:#95a5a6;">關閉</button>
+                        <button id="btn-submit-maintain" class="btn-primary" onclick="submitMaintainRoom()" style="font-size:16px; padding:9px 20px; margin:0;">🔓 驗證並進入後台</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⚠️ 方向 B：雲端連線受阻 2 步自我排除視窗 -->
+        <div id="conn-error-modal" class="overlay">
+            <div class="small-modal-card" style="border-color:#e74c3c; max-width:460px;">
+                <h2 style="margin:0 0 10px 0; color:#c0392b; font-size:20px;">⚠️ 雲端題庫連線受阻</h2>
+                <p style="font-size:13.5px; color:#555; margin:0 0 12px 0;">（可能受網路或瀏覽器限制，請依下列 2 步排除）</p>
+                <div style="background:#fff3cd; color:#856404; padding:12px 15px; border-radius:10px; border:1px solid #ffeeba; text-align:left; font-size:14.5px; font-weight:bold; line-height:1.7; margin-bottom:14px;">
+                    👉 <b>第 1 步</b>：重新整理網頁<br>
+                    👉 <b>第 2 步</b>：改用「無痕視窗」或點擊「新分頁滿版」開啟
+                </div>
+                <p id="conn-error-note" style="font-size:13.5px; color:#c0392b; font-weight:bold; margin:0 0 14px 0;"></p>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <button class="btn-warning" onclick="openInNewFullTab()" style="font-size:16px; padding:10px; margin:0;">🚀 點此改以「新分頁滿版」開啟</button>
+                    <button id="btn-offline-play" class="btn-primary" onclick="startOfflinePractice()" style="font-size:16px; padding:10px; margin:0; display:none;">🎮 先玩單機離線練習題</button>
+                    <button class="btn-secondary" onclick="document.getElementById('conn-error-modal').style.display='none'" style="background:#95a5a6; margin:0;">返回首頁</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🩺 班級錯題大數據與補救教學診斷分析彈出視窗 -->
+        <div id="diagnostic-modal" class="overlay">
+            <div class="modal-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:2px solid #eee; padding-bottom:8px;">
+                    <h2 style="margin:0; color:#8e44ad; font-size:21px;">🩺 班級錯題統計分析與補救教學建議報告</h2>
+                    <button class="btn-danger" onclick="document.getElementById('diagnostic-modal').style.display='none'">✖ 關閉報告</button>
+                </div>
+                <div id="diagnostic-report-content" style="overflow-y:auto; flex:1; padding-right:4px;"></div>
+            </div>
+        </div>
+
+        <!-- 清空確認視窗 -->
+        <div id="clear-confirm-modal" class="overlay">
+            <div class="small-modal-card" style="border-color:#e74c3c;">
+                <h2 style="margin:0 0 10px 0; color:#c0392b;">⚠️ 確定清空紀錄？</h2>
+                <p id="clear-modal-desc" style="font-size:14px; color:#555; margin:0 0 15px 0;">這將會永久刪除該代碼的所有學生成績！</p>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    <button class="btn-secondary" onclick="document.getElementById('clear-confirm-modal').style.display='none'" style="background:#95a5a6;">取消</button>
+                    <button class="btn-danger" onclick="executeClearRoomRecords()" style="font-size:16px; padding:10px 20px;">🧹 確定永久清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📱 全螢幕與 iPad 自動引導滿版新分頁視窗 -->
+        <div id="fullscreen-guide-modal" class="overlay">
+            <div class="small-modal-card" style="border-color:#f39c12; max-width:450px;">
+                <h2 style="margin:0 0 10px 0; color:#d35400;">📱 強烈建議：開啟 100% 滿版模式</h2>
+                <p style="font-size:14.5px; color:#444; line-height:1.55; margin:0 0 16px 0; text-align:left;">
+                    系統偵測到目前處於網頁內嵌框架中（iPad / 平板容易發生畫面顯示不完整或按鍵被切掉）。<br><br>
+                    請點擊下方按鈕在<b>「獨立新分頁」</b>中打開遊戲，即可享受<b> 100% 滿版無裁切</b>的最佳觸控體驗！
+                </p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button class="btn-primary" onclick="openInNewFullTab()" style="font-size:18px; padding:12px; background:linear-gradient(to bottom, #f39c12, #d35400); box-shadow:0 4px 0 #a04000;">🚀 立即在新分頁 100% 滿版開啟</button>
+                    <button class="btn-secondary" onclick="document.getElementById('fullscreen-guide-modal').style.display='none'" style="background:#95a5a6;">先留在原畫面繼續使用</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 首頁排行榜視窗 -->
+        <div id="home-board-modal" class="overlay">
+            <div class="modal-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h2 style="margin:0; color:#2c3e50; font-size:21px;">🏆 5位數代碼分流榮譽榜</h2>
+                    <button class="btn-danger" onclick="document.getElementById('home-board-modal').style.display='none'">✖ 關閉</button>
+                </div>
+                <div class="filter-bar" style="justify-content:center; background:#f1f2f6; padding:10px; border-radius:10px;">
+                    <label style="font-weight:bold;">🔑 查詢 5 位數代碼：</label>
+                    <input type="text" id="modal-query-code" value="00000" maxlength="5" style="width:95px; text-align:center;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    <button class="btn-secondary" onclick="fetchModalLeaderboard()">🔍 查詢</button>
+                </div>
+                <div id="modal-board-status" style="font-weight:bold; color:#0984e3; margin:6px 0;"></div>
+                <div class="table-container" style="flex:1;">
+                    <table>
+                        <thead><tr><th>名次</th><th>座號</th><th>姓名</th><th>最高總分</th><th>答對/失誤</th><th>最高連擊</th><th>防衛段位</th><th>練習次數</th><th>達成時間</th></tr></thead>
+                        <tbody id="modal-board-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 教師管理後台 -->
+        <div id="settings-screen" class="screen">
+            <div class="admin-header-bar">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:20px; font-weight:900; color:#2c3e50;">👩‍🏫 教師雲端管理後台</span>
+                    <span id="locked-code-badge" style="background:#0984e3; color:#fff; padding:5px 14px; border-radius:20px; font-weight:900; font-size:16px;">🔒 當前管理代碼：05011</span>
+                    <button class="btn-warning" onclick="openSwitchRoomModal()" style="font-size:13px; padding:6px 12px; margin:0;">🔄 切換其他代碼</button>
+                </div>
+                <button class="btn-primary" onclick="exitAdminToHome()" style="font-size:15px; padding:8px 16px; margin:0;">🏠 返回學生首頁</button>
+            </div>
+
+            <div class="admin-nav">
+                <button id="tab-btn-records" class="tab-btn active" onclick="switchAdminTab('records')">📊 1. 班級成績與錯題診斷歷程</button>
+                <button id="tab-btn-tasks" class="tab-btn" onclick="switchAdminTab('tasks')">🎛️ 2. 心算題型拉桿與難度設定</button>
+                <button id="tab-btn-api" class="tab-btn" onclick="switchAdminTab('api')" style="display:none;">🔗 3. 試算表後端網址設定 (最高權限)</button>
+            </div>
+
+            <div id="admin-panel-records" class="admin-panel active">
+                <div class="admin-box">
+                    <h3>
+                        <span>📊 代碼 <b id="record-box-code-label" style="color:#0984e3;">[00000]</b> 學生挑戰紀錄與錯題診斷</span>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="btn-purple" onclick="openDiagnosticModal()" style="margin:0;">🩺 錯題統計與補救教學分析</button>
+                            <button class="btn-secondary" onclick="fetchTeacherRecords()" style="margin:0;">🔄 重新整理</button>
+                            <button class="btn-warning" onclick="exportRecordsCSV()" style="background:#27ae60; margin:0;">📥 匯出 CSV</button>
+                            <button class="btn-danger" onclick="openClearConfirmModal()" style="margin:0;">🧹 清空紀錄</button>
+                        </div>
+                    </h3>
+                    <div class="filter-bar" style="background:#f8f9fa; padding:8px 12px; border-radius:8px; margin-bottom:0;">
+                        <label>📋 檢視模式：</label>
+                        <select id="admin-view-mode" onchange="renderTeacherTable()">
+                            <option value="all_logs">📝 完整練習歷程（含每次挑戰題型與「錯題診斷紀錄」）</option>
+                            <option value="best_score">🏆 每人最高分榮譽榜（同名同座號只留最高分 - 依總分排序）</option>
+                            <option value="best_seat">🔢 每人最高分成績冊（同名同座號只留最高分 - 依座號排序方便登分）</option>
+                        </select>
+                        <span id="admin-record-summary" style="font-weight:bold; color:#d35400; margin-left:auto;">載入中...</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead id="admin-records-thead"></thead>
+                        <tbody id="admin-records-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="admin-panel-tasks" class="admin-panel">
+                <div class="admin-box">
+                    <h3>
+                        <span>⚡ 一鍵載入年級心算範本（點擊後可在下方自由微調拉桿）</span>
+                        <button class="btn-primary" onclick="saveRoomConfigToCloud()" style="font-size:16px; padding:8px 20px; margin:0;">☁️ 儲存並發布設定至此代碼</button>
+                    </h3>
+                    <div class="preset-bar">
+                        <button class="preset-btn" onclick="applyPreset('default_99')">🌟 預設：九九乘法全開 (2~9段)</button>
+                        <button class="preset-btn" onclick="applyPreset('g1_addsub')">🌱 小一：20以內加減與合十</button>
+                        <button class="preset-btn" onclick="applyPreset('g2_carry')">🔥 小二：百以內必進退位加減</button>
+                        <button class="preset-btn" onclick="applyPreset('g3_muldiv')">⚔️ 小三：乘除整除與求餘數</button>
+                        <button class="preset-btn" onclick="applyPreset('g4_mix')">🧠 小四：四則混合、湊百與填空</button>
+                        <button class="preset-btn" onclick="applyPreset('g56_adv')">🎓 高年級：小數、分數與 3.14 特訓</button>
+                    </div>
+                    <div class="preview-board">
+                        <span style="color:#00ffcc; font-weight:900;">🔍 當前拉桿即時出題與鷹架預覽：</span>
+                        <div id="live-preview-list" style="display:flex; flex-wrap:wrap; gap:10px; flex:1;"></div>
+                        <button class="btn-secondary" onclick="updateLivePreview()" style="font-size:13px; padding:5px 12px; margin:0;">🎲 重抽預覽題</button>
+                    </div>
+                </div>
+
+                <div class="admin-box">
+                    <h3>⚙️ 達標過關分數、時間上限 (最高30分鐘)、放慢4倍思考速度與防投機判定</h3>
+                    <div class="slider-grid">
+                        <div class="slider-card">
+                            <label><span>🏷️ 挑戰任務標題：</span></label>
+                            <input type="text" id="cfg-title" value="九九乘法基礎特訓" style="width:100%; padding:7px; font-size:15px; font-weight:bold; border:2px solid #bdc3c7; border-radius:6px; box-sizing:border-box;">
+                        </div>
+                        <div class="slider-card">
+                            <label><span>🎯 答題輸入判定方式 (皆具防亂猜鎖定)：</span></label>
+                            <select id="cfg-input-mode" style="width:100%; padding:7px; font-size:15px; font-weight:bold; border:2px solid #0984e3; border-radius:6px;">
+                                <option value="auto">⚡ 極速秒殺模式 (數字吻合自動擊發；亂按錯字即刻扣分鎖定)</option>
+                                <option value="enter">🔒 確認發射模式 (需按 Enter/發射鍵才判定；答錯扣分鎖定)</option>
+                            </select>
+                        </div>
+                        <div class="slider-card">
+                            <label><span>🎯 過關目標分數 (達標即過關獲勝)：</span><span id="lbl-target" style="color:#00b894;">100 分 (約9題)</span></label>
+                            <input type="range" id="cfg-target" min="50" max="500" step="10" value="100" oninput="updateGlobalLabels()">
+                        </div>
+                        <div class="slider-card">
+                            <label><span>⏳ 時間總上限 (最高 30 分鐘)：</span><span id="lbl-time" style="color:#0984e3;">5 分鐘 (300秒)</span></label>
+                            <input type="range" id="cfg-time" min="60" max="1800" step="60" value="300" oninput="updateGlobalLabels()">
+                        </div>
+                        <div class="slider-card">
+                            <label><span>👾 怪獸推進速度 (1~8已放慢4倍，9~10極速)：</span><span id="lbl-speed" style="color:#d35400;">速度 2 (超慢速思考)</span></label>
+                            <input type="range" id="cfg-speed" min="1" max="10" step="1" value="2" oninput="updateGlobalLabels()">
+                        </div>
+                        <div class="slider-card">
+                            <label><span>🛸 同場最多出現幾顆算式怪獸：</span><span id="lbl-max-meteors" style="color:#8e44ad;">最多 2 題 (推薦專注)</span></label>
+                            <input type="range" id="cfg-max-meteors" min="1" max="4" step="1" value="2" oninput="updateGlobalLabels()">
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:10px; font-weight:bold; font-size:14px;">
+                        <label style="cursor:pointer;"><input type="checkbox" id="cfg-adaptive" checked> 📈 隨分數自動微幅提升難度</label>
+                        <label style="cursor:pointer;"><input type="checkbox" id="cfg-pause" checked> ⏸️ 允許學生暫停</label>
+                        <label style="cursor:pointer;"><input type="checkbox" id="cfg-voice" checked> 🔊 語音唸出目前鎖定的算式</label>
+                    </div>
+                    <div style="margin-top:12px; background:#fffbea; border:2px solid #facc15; border-radius:10px; padding:10px 12px; font-size:14px; font-weight:bold; color:#854d0e;">
+                        <label style="cursor:pointer;"><input type="checkbox" id="set-list-home"> 📢 公開到首頁「遊戲代碼公開區」（讓其他班的學生也能找到並練習這組代碼）</label>
+                    </div>
+                </div>
+
+                <div class="module-grid">
+                    <div id="mod-card-addsub" class="module-card">
+                        <div class="module-title">
+                            <input type="checkbox" id="mod-addsub-enable" style="width:20px; height:20px;" onchange="onModuleToggle()">
+                            <label for="mod-addsub-enable" style="cursor:pointer; flex:1;">➕➖ 模組 A：整數加減法 (含進退位控制)</label>
+                        </div>
+                        <div style="display:flex; gap:15px; margin-bottom:10px; font-weight:bold;">
+                            <label><input type="checkbox" id="addsub-op-add" checked onchange="updateLivePreview()"> 加法 (+)</label>
+                            <label><input type="checkbox" id="addsub-op-sub" checked onchange="updateLivePreview()"> 減法 (-)</label>
+                        </div>
+                        <div class="slider-card" style="margin-bottom:8px;">
+                            <label><span>第一個數 (被加/被減數) 上限：</span><span id="lbl-addsub-max1" style="color:#0984e3;">1 ~ 99</span></label>
+                            <input type="range" id="addsub-max1" min="10" max="999" step="1" value="99" oninput="updateAddSubLabels()">
+                            <div style="display:flex; gap:5px; margin-top:4px;">
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max1',10)">10以內</button>
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max1',20)">20以內</button>
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max1',99)">二位數(99)</button>
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max1',999)">三位數(999)</button>
+                            </div>
+                        </div>
+                        <div class="slider-card" style="margin-bottom:8px;">
+                            <label><span>第二個數 (加數/減數) 上限：</span><span id="lbl-addsub-max2" style="color:#0984e3;">1 ~ 99</span></label>
+                            <input type="range" id="addsub-max2" min="9" max="999" step="1" value="99" oninput="updateAddSubLabels()">
+                            <div style="display:flex; gap:5px; margin-top:4px;">
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max2',9)">一位數(1~9)</button>
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max2',99)">二位數(1~99)</button>
+                                <button class="preset-btn" style="padding:2px 8px; font-size:12px;" onclick="setSlider('addsub-max2',999)">三位數</button>
+                            </div>
+                        </div>
+                        <div class="slider-card">
+                            <label><span>🔥 進位 / 退位規則設定：</span></label>
+                            <select id="addsub-carry-mode" onchange="updateLivePreview()" style="width:100%; padding:6px; font-weight:bold; border-radius:6px; border:1px solid #bdc3c7;">
+                                <option value="random">🎲 隨機自然出題 (混合進退位與不進退位)</option>
+                                <option value="no_carry">🌱 僅限「不進位 / 不退位」 (初學建立直覺)</option>
+                                <option value="force_carry">💪 強制「必進位 / 必退位」 (突破個位滿十借位瓶頸)</option>
+                                <option value="round_10">🎯 整十 / 整百加減 (如 40+80, 320-150)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="mod-card-muldiv" class="module-card enabled">
+                        <div class="module-title">
+                            <input type="checkbox" id="mod-muldiv-enable" checked style="width:20px; height:20px;" onchange="onModuleToggle()">
+                            <label for="mod-muldiv-enable" style="cursor:pointer; flex:1;">✖️➗ 模組 B：整數乘除法 (九九乘法選段與餘數)</label>
+                        </div>
+                        <div style="font-size:14px; font-weight:bold; margin-bottom:6px;">
+                            <label><input type="checkbox" id="mul-99-enable" checked onchange="updateLivePreview()"> 1. 九九乘法表 (點選要訓練的段數)：</label>
+                            <div class="chip-group" id="mul-99-chips">
+                                <span class="num-chip selected" data-val="2" onclick="toggleChip(this)">2段</span>
+                                <span class="num-chip selected" data-val="3" onclick="toggleChip(this)">3段</span>
+                                <span class="num-chip selected" data-val="4" onclick="toggleChip(this)">4段</span>
+                                <span class="num-chip selected" data-val="5" onclick="toggleChip(this)">5段</span>
+                                <span class="num-chip selected" data-val="6" onclick="toggleChip(this)">6段</span>
+                                <span class="num-chip selected" data-val="7" onclick="toggleChip(this)">7段</span>
+                                <span class="num-chip selected" data-val="8" onclick="toggleChip(this)">8段</span>
+                                <span class="num-chip selected" data-val="9" onclick="toggleChip(this)">9段</span>
+                            </div>
+                        </div>
+                        <div class="slider-card" style="margin-bottom:8px;">
+                            <label style="justify-content:flex-start; gap:8px;">
+                                <input type="checkbox" id="mul-2d1d-enable" onchange="updateLivePreview()">
+                                <span>2. 二位數 × 一位數 (上限：<b id="lbl-mul-2d" style="color:#0984e3;">50</b> × 9)</span>
+                            </label>
+                            <input type="range" id="mul-2d-max" min="15" max="99" step="1" value="50" oninput="document.getElementById('lbl-mul-2d').innerText=this.value; updateLivePreview();">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px; font-size:14px; font-weight:bold;">
+                            <label><input type="checkbox" id="mul-round-enable" onchange="updateLivePreview()"> 3. 整十/整百倍數乘法 (如 30 × 6, 40 × 50)</label>
+                            <label><input type="checkbox" id="div-basic-enable" onchange="updateLivePreview()"> 4. 表內整除除法 (九九乘法逆運算，如 56 ÷ 7)</label>
+                            <label><input type="checkbox" id="div-2d1d-enable" onchange="updateLivePreview()"> 5. 二位數 ÷ 一位數整除 (如 72 ÷ 6, 96 ÷ 4)</label>
+                            <label style="color:#d35400;"><input type="checkbox" id="div-rem-enable" onchange="updateLivePreview()"> 6. 有餘數除法・專求「餘數」 (如：50 ÷ 8 餘 ?)</label>
+                        </div>
+                    </div>
+
+                    <div id="mod-card-mix" class="module-card">
+                        <div class="module-title">
+                            <input type="checkbox" id="mod-mix-enable" style="width:20px; height:20px;" onchange="onModuleToggle()">
+                            <label for="mod-mix-enable" style="cursor:pointer; flex:1;">🧠 模組 C：巧算湊整、四則混合與逆運算填空</label>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:10px; font-size:14px; font-weight:bold;">
+                            <label><input type="checkbox" id="mix-make100" checked onchange="updateLivePreview()"> 🎯 湊十與湊百巧算 (如 28+46+72、198+56、345-99)</label>
+                            <label><input type="checkbox" id="mix-golden" onchange="updateLivePreview()"> 💎 乘法黃金拍檔與分配律 (25×4、125×8變形、99×7、102×6)</label>
+                            <label><input type="checkbox" id="mix-order" checked onchange="updateLivePreview()"> ⚖️ 四則混合・先乘除後加減 (如 50 - 6 × 7、18 + 45 ÷ 9)</label>
+                            <label style="color:#8e44ad;"><input type="checkbox" id="mix-unknown" checked onchange="updateLivePreview()"> ❓ 未知數逆運算填空 (如 □ + 27 = 65、80 - □ = 34、7 × □ = 63)</label>
+                        </div>
+                    </div>
+
+                    <div id="mod-card-adv" class="module-card">
+                        <div class="module-title">
+                            <input type="checkbox" id="mod-adv-enable" style="width:20px; height:20px;" onchange="onModuleToggle()">
+                            <label for="mod-adv-enable" style="cursor:pointer; flex:1;">🎓 模組 D：高年級專區 (小數 / 分數 / 平方 / 圓周率3.14)</label>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:9px; font-size:14px; font-weight:bold;">
+                            <label><input type="checkbox" id="adv-dec-addsub" checked onchange="updateLivePreview()"> 💧 一位小數加減法 (如 3.6 + 2.8、6.4 - 1.9)</label>
+                            <label><input type="checkbox" id="adv-dec-mul" onchange="updateLivePreview()"> ⚡ 常用小數乘法心算 (如 0.5 × 14、1.5 × 6、0.25 × 8、1.2 × 5)</label>
+                            <label style="color:#c0392b;"><input type="checkbox" id="adv-pi" checked onchange="updateLivePreview()"> ⭕ 圓周率 3.14 倍數特訓 (3.14 × 1~9 及 16, 25, 36 等平方數)</label>
+                            <label><input type="checkbox" id="adv-frac" onchange="updateLivePreview()"> 🍰 常用分數化小數 (如 3/4 = ? 答 0.75、3/8 = ? 答 0.375)</label>
+                            <label><input type="checkbox" id="adv-square" onchange="updateLivePreview()"> ² 完全平方數直覺 (1² ~ 20²，如 15² = ? 答 225)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="width:100%; display:flex; justify-content:center; margin-top:18px;">
+                    <button class="btn-primary" onclick="saveRoomConfigToCloud()" style="font-size:19px; padding:12px 35px;">☁️ 儲存並發布心算規則至代碼</button>
+                </div>
+            </div>
+
+            <div id="admin-panel-api" class="admin-panel">
+                <div class="admin-box">
+                    <h3>👑 最高管理員專屬：Google 試算表後端網址 (Web App URL) 設定</h3>
+                    <p style="font-size:14px; color:#555; line-height:1.6;">🔒 後端網址已固定在程式碼裡（唯讀）。若未來更換試算表，請修改程式碼中的 DEFAULT_GAS_URL。</p>
+                    <div class="filter-bar">
+                        <input type="text" id="gas-url-input" readonly style="flex:1; font-size:13px; background:#f8f9fa; color:#555;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 遊戲主畫面 -->
+        <div id="game-screen" class="screen" onclick="refocusGame()">
+            <div id="hud">
+                <div class="hud-left">
+                    <div class="time-box">⏳ <span id="time-display">300</span>s</div>
+                    <div class="progress-wrapper">
+                        <div class="progress-label">
+                            <span id="rank-display">🔫 守衛塔</span>
+                            <span>🎯 任務進度: <b id="score-display" style="color:#fff;">0</b> / <b id="target-display">100</b>分</span>
+                        </div>
+                        <div class="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+                    </div>
+                </div>
+                <div class="aim-box">
+                    <div id="answer-screen" title="輸入數字瞄準擊發">⚡秒殺瞄準</div>
+                    <div id="combo-badge" class="combo-badge">🔥 COMBO x2</div>
+                </div>
+                <div class="hud-right">
+                    <div class="skill-badge skill-freeze active" id="freeze-badge" onclick="activateFreezeHint()" title="全場冰封慢動作8秒＋顯示思考策略提示 (空白鍵)">❄️ 冰封提示 x<span id="freeze-count">1</span></div>
+                    <div class="skill-badge skill-double active" id="double-badge" onclick="activateDoubleScore()" title="10秒內親手算對得分雙倍 (Shift鍵)">🔥 雙倍分 x<span id="double-count">1</span></div>
+                    <button id="voice-toggle-btn" class="icon-circle-btn" onclick="toggleVoiceInGame()" title="切換語音">🔊</button>
+                    <button class="icon-circle-btn" onclick="toggleFullScreen()" title="全螢幕">⛶</button>
+                    <button id="pause-btn" class="icon-circle-btn" onclick="togglePause()" title="暫停遊戲" style="background:#f39c12; color:#fff;">⏸️</button>
+                    <button id="end-btn" class="icon-circle-btn" onclick="requestEndGame()" title="提早結束並結算成績" style="background:#e74c3c; color:#fff;">🏁</button>
+                </div>
+            </div>
+
+            <div id="canvas-container">
+                <canvas id="game-canvas"></canvas>
+                <div id="penalty-warning">⚠️ 算式答案不對喔！能量冷卻 2 秒</div>
+                <div id="pause-overlay" class="overlay">
+                    <h2 style="font-size: 36px; margin-bottom: 20px;">⏸️ 戰場暫停</h2>
+                    <button class="btn-primary" onclick="resumeGame()">▶ 繼續作戰</button>
+                    <button class="btn-warning" onclick="isPaused=false; document.getElementById('pause-overlay').style.display='none'; endGame('manual')">🏁 結束並結算成績</button>
+                    <button class="btn-secondary" onclick="restartGame()">🔄 重新開始</button>
+                    <button class="btn-secondary" onclick="backToHomeFromGame()">🏠 回主畫面</button>
+                </div>
+            </div>
+
+            <div id="controls">
+                <div id="numpad-grid">
+                    <button class="num-btn" data-key="1" onmousedown="pressNum('1', event)" ontouchstart="pressNum('1', event)">1</button>
+                    <button class="num-btn" data-key="2" onmousedown="pressNum('2', event)" ontouchstart="pressNum('2', event)">2</button>
+                    <button class="num-btn" data-key="3" onmousedown="pressNum('3', event)" ontouchstart="pressNum('3', event)">3</button>
+                    <button class="num-btn" data-key="4" onmousedown="pressNum('4', event)" ontouchstart="pressNum('4', event)">4</button>
+                    <button class="num-btn" data-key="5" onmousedown="pressNum('5', event)" ontouchstart="pressNum('5', event)">5</button>
+                    <button class="num-btn btn-clear" data-key="Backspace" onmousedown="pressBackspace(event)" ontouchstart="pressBackspace(event)">⌫ 清除</button>
+                    <button class="num-btn btn-skill-ice" onmousedown="activateFreezeHint(event)" ontouchstart="activateFreezeHint(event)">❄️ 提示</button>
+                    <button class="num-btn" data-key="6" onmousedown="pressNum('6', event)" ontouchstart="pressNum('6', event)">6</button>
+                    <button class="num-btn" data-key="7" onmousedown="pressNum('7', event)" ontouchstart="pressNum('7', event)">7</button>
+                    <button class="num-btn" data-key="8" onmousedown="pressNum('8', event)" ontouchstart="pressNum('8', event)">8</button>
+                    <button class="num-btn" data-key="9" onmousedown="pressNum('9', event)" ontouchstart="pressNum('9', event)">9</button>
+                    <button class="num-btn" data-key="0" onmousedown="pressNum('0', event)" ontouchstart="pressNum('0', event)">0</button>
+                    <button class="num-btn" data-key="." onmousedown="pressNum('.', event)" ontouchstart="pressNum('.', event)">.</button>
+                    <button class="num-btn btn-fire" data-key="Enter" onmousedown="pressFire(event)" ontouchstart="pressFire(event)">🔥 發射</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🏁 輪流接力：下一位同學 -->
+        <div id="relay-next-modal" class="overlay">
+            <div class="small-modal-card">
+                <h2 style="margin:0 0 6px 0; color:#d35400;">🏁 換下一位同學上台！</h2>
+                <p id="relay-next-desc" style="font-size:14px; color:#555; margin:0 0 12px 0;">同一組代碼與題型，成績各自上傳。</p>
+                <div class="login-form" style="margin-bottom:12px;">
+                    <div class="form-group"><label>🔢 座號 <span style="font-weight:normal; color:#7f8c8d;">(選填)</span></label><input type="text" id="relay-seat" maxlength="5" placeholder="例如: 06"></div>
+                    <div class="form-group"><label>👤 姓名 <span style="color:#e74c3c;">*必填</span></label><input type="text" id="relay-name" maxlength="12" placeholder="下一位的名字" onkeydown="if(event.key==='Enter') startNextRelayPlayer()"></div>
+                </div>
+                <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+                    <button class="btn-secondary" onclick="document.getElementById('relay-next-modal').style.display='none'" style="background:#95a5a6;">取消</button>
+                    <button class="btn-primary" onclick="startNextRelayPlayer()" style="font-size:18px; margin:0;">🚀 準備好了，開始！</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 結算頁 -->
+        <div id="result-screen" class="screen">
+            <div class="result-card">
+                <h1 id="result-main-title" style="font-size: 30px; margin: 0 0 6px 0; color: #2c3e50;">🎉 恭喜達標！星際防衛任務成功！</h1>
+                <div id="final-rank-title" style="font-size: 18px; font-weight: 900; color: #0984e3; margin-bottom: 10px;">最終防衛武裝：🛸 雙管脈衝砲</div>
+                <div class="score-summary">
+                    <div style="font-size: 34px; font-weight: 900; color: #e74c3c;">總分: <span id="final-score">0</span></div>
+                    <div style="font-size: 16px; font-weight: bold; color: #27ae60;">✅ 答對: <span id="final-correct">0</span> 題</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #c0392b;">❌ 失誤: <span id="final-wrong">0</span> 次</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #e67e22;">🔥 最高連擊: <span id="final-max-combo">0</span></div>
+                    <div style="font-size: 16px; font-weight: bold; color: #2980b9;">⏱️ 耗時: <span id="final-duration">0</span> 秒</div>
+                </div>
+                <div id="bonus-breakdown-box" class="bonus-breakdown"></div>
+                <div id="relay-box"></div>
+                <div id="wrong-review-box" style="display:none; background:#fff3cd; color:#856404; padding:10px 14px; border-radius:10px; border:1px solid #ffeeba; margin-bottom:12px; font-size:14px; text-align:left; font-weight:bold;"></div>
+                <div class="board-box">
+                    <div class="board-header">
+                        <span id="result-board-title">🏆 代碼 [00000] 榮譽排行榜 (每人最高分)</span>
+                        <span id="result-upload-status" style="font-size:13px; background:rgba(0,0,0,0.25); padding:3px 10px; border-radius:12px;">☁️ 成績上傳中...</span>
+                    </div>
+                    <div class="board-scroll">
+                        <table>
+                            <thead><tr><th>名次</th><th>座號</th><th>姓名</th><th>最高分</th><th>答對/失誤</th><th>連擊</th><th>武裝稱號</th><th>練習次數</th><th>達成時間</th></tr></thead>
+                            <tbody id="result-board-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div style="margin-top: 14px; display:flex; justify-content:center; flex-wrap:wrap; gap:8px;">
+                    <button id="relay-next-btn" class="btn-warning" onclick="openRelayNext()" style="display:none; font-size:19px; padding:11px 22px;">👉 下一位同學接力</button>
+                    <button class="btn-primary" onclick="restartGame()">🔄 再戰一場 (挑戰更快更準)</button>
+                    <button class="btn-secondary" onclick="backToHome()">🏠 回首頁 / 教師管理</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyGmxcj9F_9lyrP5XQ_qhIO0jxgp30QvB-BP1jjoDbNps83r2eZ98Ua0ZQsdgoeNEsc/exec";
+
+        let adminSession = {
+            roomCode: "00000",
+            pin: "",
+            isSuperAdmin: false,
+            teacherPass: "",
+            teacherName: "",
+            myRooms: [],
+            remainingQuota: 5,
+            maxQuota: 5
+        };
+
+        function getGasUrl() { return DEFAULT_GAS_URL; }   // 🔒 v2.0：網址固定在程式碼裡（不讓瀏覽器記憶覆蓋）
+        function saveGasUrl() { showToast('🔒 後端網址已固定在程式碼裡，要更換請改程式碼中的 DEFAULT_GAS_URL'); }
+
+        function unpackLogRecord(r) {
+            let rawRank = String(r.rankTitle || "");
+            let topic = String(r.topicSummary || "");
+            let wrong = String(r.wrongDetails || "");
+            if (rawRank.includes("||")) {
+                const parts = rawRank.split("||");
+                rawRank = parts[0] || "";
+                if (!topic) topic = parts[1] || "";
+                if (!wrong || wrong === "無") wrong = parts[2] || "無";
+            }
+            return Object.assign({}, r, {
+                rankTitle: rawRank,
+                topicSummary: topic || "心算特訓",
+                wrongDetails: wrong || "全對無失誤"
+            });
+        }
+
+        function toggleFullScreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().then(() => setTimeout(resizeCanvas, 150))
+                        .catch(() => document.getElementById('fullscreen-guide-modal').style.display = 'flex');
+                } else if (elem.webkitRequestFullscreen) {
+                    try { elem.webkitRequestFullscreen(); setTimeout(resizeCanvas, 150); }
+                    catch (e) { document.getElementById('fullscreen-guide-modal').style.display = 'flex'; }
+                } else {
+                    document.getElementById('fullscreen-guide-modal').style.display = 'flex';
+                }
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+            refocusGame();
+        }
+
+        function openInNewFullTab() {
+            document.getElementById('fullscreen-guide-modal').style.display = 'none';
+            document.getElementById('conn-error-modal').style.display = 'none';
+            const codeEl = document.getElementById('login-code');
+            const seatEl = document.getElementById('login-seat');
+            const nameEl = document.getElementById('login-name');
+            if (codeEl) codeEl.setAttribute('value', codeEl.value);
+            if (seatEl) seatEl.setAttribute('value', seatEl.value);
+            if (nameEl) nameEl.setAttribute('value', nameEl.value);
+
+            const blob = new Blob(["<!DOCTYPE html>\n" + document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+            window.open(URL.createObjectURL(blob), '_blank');
+        }
+
+        function getDefaultConfig() {
+            return {
+                title: "九九乘法基礎特訓", inputMode: "auto", targetScore: 100, time: 300, speed: 2, maxMeteors: 2,
+                adaptive: true, allowPause: true, enableVoice: true,
+                addsub: { enabled: false, add: true, sub: true, max1: 99, max2: 99, carryMode: "random" },
+                muldiv: { enabled: true, mul99: true, tables: [2,3,4,5,6,7,8,9], mul2d1d: false, mul2dMax: 50, mulRound: false, divBasic: false, div2d1d: false, divRem: false },
+                mix: { enabled: false, make100: true, golden: false, order: true, unknown: true },
+                adv: { enabled: false, decAddSub: true, decMul: false, pi: true, frac: false, square: false }
+            };
+        }
+        function getDefaultParams() { return getDefaultConfig(); }
+
+        let currentConfig = getDefaultConfig();
+        let currentStudent = { roomCode: "00000", seatNo: "-", playerName: "星際防衛員" };
+        let cachedTeacherData = { roomCode: "00000", leaderboard: [], allLogs: [] };
+
+        window.onload = function() {
+            try {
+                if (localStorage.getItem('MD_CODE') && document.getElementById('login-code').value === "00000") {
+                    document.getElementById('login-code').value = localStorage.getItem('MD_CODE');
+                }
+                if (localStorage.getItem('MD_SEAT') && !document.getElementById('login-seat').value) {
+                    document.getElementById('login-seat').value = localStorage.getItem('MD_SEAT');
+                }
+                if (localStorage.getItem('MD_NAME') && !document.getElementById('login-name').value) {
+                    document.getElementById('login-name').value = localStorage.getItem('MD_NAME');
+                }
+            } catch (e) {}
+
+            let isInIframe = false;
+            try { isInIframe = (window.self !== window.top); } catch (e) { isInIframe = true; }
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+            if (!isInIframe) {
+                const promoBox = document.getElementById('newtab-promo-box');
+                if (promoBox) promoBox.style.display = 'none';
+            } else if (isTouchDevice) {
+                document.getElementById('fullscreen-guide-modal').style.display = 'flex';
+            }
+
+            document.getElementById('gas-url-input').value = getGasUrl();
+            try { if (localStorage.getItem('MD_PLAY_MODE') === 'relay') setPlayMode('relay'); } catch (e) {}
+            loadConfigToUI(currentConfig);
+            showScreen('home-screen');
+        };
+
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function buildScaffoldHint(qStr) {
+            const q = qStr.trim();
+            if (q.includes('□')) {
+                if (q.includes('+')) {
+                    const p = q.split(/[\+=]/).map(s => s.trim());
+                    return `💡 逆思考：用 ${p[2]} 減去 ${p[0] === '□' ? p[1] : p[0]}`;
+                }
+                if (q.includes('-')) {
+                    const p = q.split(/[\-=]/).map(s => s.trim());
+                    return `💡 逆思考：用 ${p[0]} 減去 ${p[2]}`;
+                }
+                if (q.includes('×')) {
+                    const p = q.split(/[×=]/).map(s => s.trim());
+                    return `💡 想：${p[0] === '□' ? p[1] : p[0]} 的幾倍是 ${p[2]}？`;
+                }
+            }
+            if (q.includes('餘?')) {
+                const m = q.match(/(\d+)\s*÷\s*(\d+)/);
+                if (m) {
+                    const d1 = Number(m[1]), d2 = Number(m[2]), quo = Math.floor(d1 / d2);
+                    return `💡 想：${d2} × ${quo} = ${d2 * quo}，還差多少到 ${d1}？`;
+                }
+            }
+            if (q.includes('÷') && !q.includes('+') && !q.includes('-')) {
+                const m = q.match(/(\d+)\s*÷\s*(\d+)/);
+                if (m) {
+                    const d1 = Number(m[1]), d2 = Number(m[2]);
+                    if (d1 / d2 <= 9) return `💡 乘法逆思考：${d2} × ( ? ) = ${d1}`;
+                    const tens = Math.floor((d1 / d2) / 10) * 10;
+                    return `💡 先拆整十：${d2} × ${tens} = ${d2 * tens}`;
+                }
+            }
+            if ((q.includes('+') || q.includes('-')) && (q.includes('×') || q.includes('÷'))) {
+                const mulMatch = q.match(/(\d+)\s*×\s*(\d+)/);
+                if (mulMatch) return `💡 先乘除後加減：先算 ${mulMatch[1]} × ${mulMatch[2]}！`;
+                return `💡 規則：先算乘除，最後再算加減喔！`;
+            }
+            if (q.startsWith('3.14')) {
+                const m = q.match(/3\.14\s*×\s*(\d+)/);
+                if (m) return `💡 拆解：先算 3×${m[1]}=${3*Number(m[1])}，再加 0.14×${m[1]}`;
+            }
+            if (q.includes('²')) {
+                const n = parseInt(q);
+                return `💡 平方就是自己乘自己：${n} × ${n}`;
+            }
+            if (q.includes('/')) {
+                const m = q.match(/(\d+)\/(\d+)/);
+                if (m) return `💡 分數轉小數：用 ${m[1]} 除以 ${m[2]}`;
+            }
+            if (q.includes('×')) {
+                const m = q.match(/([\d\.]+)\s*×\s*([\d\.]+)/);
+                if (m) {
+                    const a = Number(m[1]), b = Number(m[2]);
+                    if (Number.isInteger(a) && Number.isInteger(b)) {
+                        if (a <= 9 && b <= 9) {
+                            const big = Math.max(a, b), small = Math.min(a, b);
+                            if (small <= 3) return `💡 連加思考：${small} 個 ${big} 相加`;
+                            return `💡 想：${big}×${small - 1}=${big * (small - 1)}，再加 ${big}`;
+                        }
+                        if (a >= 10 && b <= 9) {
+                            const tens = Math.floor(a / 10) * 10, ones = a % 10;
+                            return `💡 分配律：先算 ${tens}×${b}=${tens * b}，再加 ${ones}×${b}`;
+                        }
+                    }
+                    return `💡 小數乘法：先當整數相乘，再點上小數點`;
+                }
+            }
+            if ((q.match(/\+/g) || []).length >= 2) return `💡 巧算：找找看哪兩個數加起來剛好湊成 100！`;
+            if (q.includes('+')) {
+                const m = q.match(/([\d\.]+)\s*\+\s*([\d\.]+)/);
+                if (m) {
+                    const a = Number(m[1]), b = Number(m[2]);
+                    if (Number.isInteger(a) && Number.isInteger(b)) {
+                        if (a >= 98 && a <= 199 && (a % 10 >= 8)) {
+                            const rUp = Math.ceil(a / 10) * 10;
+                            return `💡 湊整巧算：先算 ${rUp} + ${b}，再減 ${rUp - a}`;
+                        }
+                        if (b >= 10) {
+                            const bT = Math.floor(b / 10) * 10, bO = b % 10;
+                            return `💡 拆解法：先算 ${a}+${bT}=${a + bT}，再加 ${bO}`;
+                        }
+                        if ((a % 10) + b >= 10) {
+                            const need = 10 - (a % 10);
+                            return `💡 湊十法：${a} 先加 ${need} 湊成 ${a + need}，再加剩下的`;
+                        }
+                    }
+                    return `💡 對齊位值：個位加個位，十位加十位`;
+                }
+            }
+            if (q.includes('-')) {
+                const m = q.match(/([\d\.]+)\s*\-\s*([\d\.]+)/);
+                if (m) {
+                    const a = Number(m[1]), b = Number(m[2]);
+                    if (Number.isInteger(a) && Number.isInteger(b)) {
+                        if (b === 98 || b === 99) return `💡 湊百巧算：先減 100，再加回 ${100 - b}`;
+                        if (b >= 10) {
+                            const bT = Math.floor(b / 10) * 10, bO = b % 10;
+                            return `💡 拆減法：先算 ${a}-${bT}=${a - bT}，再減 ${bO}`;
+                        }
+                        if ((a % 10) < b) return `💡 退位思考：個位不夠減，跟十位借 10 來減`;
+                    }
+                    return `💡 對齊位值：從高位往低位逐步相減`;
+                }
+            }
+            return `💡 看清運算符號，一步步拆解心算！`;
+        }
+
+        function generateMathQuestion(cfg, scoreProgress = 0) {
+            const generators = [];
+            const boost = (cfg.adaptive && scoreProgress > 40) ? Math.min(0.45, scoreProgress / 300) : 0;
+
+            if (cfg.addsub && cfg.addsub.enabled) {
+                const max1 = Math.max(10, Number(cfg.addsub.max1) || 99);
+                const max2 = Math.max(9, Number(cfg.addsub.max2) || 99);
+                const mode = cfg.addsub.carryMode || "random";
+                if (cfg.addsub.add) {
+                    generators.push(() => {
+                        if (mode === "round_10") {
+                            const a = randInt(1, 9) * (max1 > 100 ? 100 : 10), b = randInt(1, 9) * (max2 > 100 ? 100 : 10);
+                            return { q: `${a} + ${b}`, a: String(a + b) };
+                        }
+                        for (let t = 0; t < 40; t++) {
+                            const a = randInt(Math.max(1, Math.floor(max1 * boost * 0.5)), max1), b = randInt(1, Math.min(max2, max1));
+                            const hasC = ((a % 10) + (b % 10) >= 10) || ((Math.floor(a/10)%10 + Math.floor(b/10)%10) >= 10);
+                            if (mode === "no_carry" && hasC) continue;
+                            if (mode === "force_carry" && !hasC) continue;
+                            return { q: `${a} + ${b}`, a: String(a + b) };
+                        }
+                        const a = randInt(15, 48), b = randInt(16, 49);
+                        return { q: `${a} + ${b}`, a: String(a + b) };
+                    });
+                }
+                if (cfg.addsub.sub) {
+                    generators.push(() => {
+                        if (mode === "round_10") {
+                            const a = randInt(3, 9) * (max1 > 100 ? 100 : 10);
+                            const b = randInt(1, (a / (max1 > 100 ? 100 : 10)) - 1) * (max1 > 100 ? 100 : 10);
+                            return { q: `${a} - ${b}`, a: String(a - b) };
+                        }
+                        for (let t = 0; t < 40; t++) {
+                            const a = randInt(Math.max(10, Math.floor(max1 * 0.25)), max1), b = randInt(1, Math.min(a - 1, max2));
+                            const hasB = (a % 10) < (b % 10);
+                            if (mode === "no_carry" && hasB) continue;
+                            if (mode === "force_carry" && !hasB) continue;
+                            return { q: `${a} - ${b}`, a: String(a - b) };
+                        }
+                        const a = randInt(32, 85), b = randInt(15, a - 5);
+                        return { q: `${a} - ${b}`, a: String(a - b) };
+                    });
+                }
+            }
+
+            if (cfg.muldiv && cfg.muldiv.enabled) {
+                const tables = (cfg.muldiv.tables && cfg.muldiv.tables.length) ? cfg.muldiv.tables : [2,3,4,5,6,7,8,9];
+                if (cfg.muldiv.mul99) {
+                    generators.push(() => {
+                        const a = Number(pickRandom(tables)), b = randInt(2, 9);
+                        return Math.random() < 0.5 ? { q: `${a} × ${b}`, a: String(a * b) } : { q: `${b} × ${a}`, a: String(a * b) };
+                    });
+                }
+                if (cfg.muldiv.mul2d1d) {
+                    generators.push(() => {
+                        const a = randInt(12, Number(cfg.muldiv.mul2dMax) || 50), b = randInt(2, 9);
+                        return { q: `${a} × ${b}`, a: String(a * b) };
+                    });
+                }
+                if (cfg.muldiv.mulRound) {
+                    generators.push(() => {
+                        const a = randInt(2, 9) * 10, b = Math.random() < 0.5 ? randInt(2, 9) : randInt(2, 9) * 10;
+                        return { q: `${a} × ${b}`, a: String(a * b) };
+                    });
+                }
+                if (cfg.muldiv.divBasic) {
+                    generators.push(() => {
+                        const b = Number(pickRandom(tables)), ans = randInt(2, 9);
+                        return { q: `${b * ans} ÷ ${b}`, a: String(ans) };
+                    });
+                }
+                if (cfg.muldiv.div2d1d) {
+                    generators.push(() => {
+                        const b = randInt(2, 8), ans = randInt(11, Math.floor(98 / b));
+                        return { q: `${b * ans} ÷ ${b}`, a: String(ans) };
+                    });
+                }
+                if (cfg.muldiv.divRem) {
+                    generators.push(() => {
+                        const b = randInt(3, 9), q = randInt(2, 9), rem = randInt(1, b - 1);
+                        return { q: `${b * q + rem} ÷ ${b} 餘?`, a: String(rem) };
+                    });
+                }
+            }
+
+            if (cfg.mix && cfg.mix.enabled) {
+                if (cfg.mix.make100) {
+                    generators.push(() => {
+                        const type = randInt(1, 3);
+                        if (type === 1) { const a = randInt(11, 89), c = 100 - a, b = randInt(15, 75); return { q: `${a}+${b}+${c}`, a: String(100 + b) }; }
+                        if (type === 2) { const near = pickRandom([98, 99, 198, 199]), b = randInt(25, 85); return { q: `${near} + ${b}`, a: String(near + b) }; }
+                        const a = randInt(120, 260), near = pickRandom([98, 99]); return { q: `${a} - ${near}`, a: String(a - near) };
+                    });
+                }
+                if (cfg.mix.golden) {
+                    generators.push(() => pickRandom([
+                        { q: "25 × 4", a: "100" }, { q: "25 × 8", a: "200" }, { q: "25 × 12", a: "300" },
+                        { q: "25 × 16", a: "400" }, { q: "125 × 8", a: "1000" }, { q: "15 × 6", a: "90" },
+                        { q: "99 × 5", a: "495" }, { q: "99 × 6", a: "594" }, { q: "102 × 4", a: "408" },
+                        { q: "101 × 8", a: "808" }, { q: "50 × 18", a: "900" }
+                    ]));
+                }
+                if (cfg.mix.order) {
+                    generators.push(() => {
+                        const b = randInt(2, 9), c = randInt(2, 9), prod = b * c;
+                        if (Math.random() < 0.5) { const a = randInt(10, 50); return { q: `${a} + ${b} × ${c}`, a: String(a + prod) }; }
+                        const a = randInt(prod + 5, prod + 45); return { q: `${a} - ${b} × ${c}`, a: String(a - prod) };
+                    });
+                }
+                if (cfg.mix.unknown) {
+                    generators.push(() => {
+                        const type = randInt(1, 3);
+                        if (type === 1) { const ans = randInt(12, 55), b = randInt(12, 45); return { q: `□ + ${b} = ${ans + b}`, a: String(ans) }; }
+                        if (type === 2) { const ans = randInt(12, 48), res = randInt(15, 50); return { q: `${ans + res} - □ = ${res}`, a: String(ans) }; }
+                        const a = randInt(2, 9), ans = randInt(2, 9); return { q: `${a} × □ = ${a * ans}`, a: String(ans) };
+                    });
+                }
+            }
+
+            if (cfg.adv && cfg.adv.enabled) {
+                if (cfg.adv.decAddSub) {
+                    generators.push(() => {
+                        const a = randInt(11, 69), b = randInt(11, 59);
+                        if (Math.random() < 0.5) return { q: `${(a/10).toFixed(1)} + ${(b/10).toFixed(1)}`, a: String((a + b) / 10) };
+                        const big = Math.max(a, b) + 12, small = Math.min(a, b);
+                        return { q: `${(big/10).toFixed(1)} - ${(small/10).toFixed(1)}`, a: String((big - small) / 10) };
+                    });
+                }
+                if (cfg.adv.decMul) {
+                    generators.push(() => pickRandom([
+                        { q: "0.5 × 6", a: "3" }, { q: "0.5 × 14", a: "7" }, { q: "1.5 × 4", a: "6" },
+                        { q: "1.5 × 6", a: "9" }, { q: "2.5 × 4", a: "10" }, { q: "2.5 × 8", a: "20" },
+                        { q: "0.25 × 4", a: "1" }, { q: "0.25 × 8", a: "2" }, { q: "1.2 × 5", a: "6" },
+                        { q: "0.8 × 5", a: "4" }, { q: "0.4 × 7", a: "2.8" }, { q: "0.6 × 8", a: "4.8" }
+                    ]));
+                }
+                if (cfg.adv.pi) {
+                    generators.push(() => {
+                        const m = pickRandom([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 25, 36, 100]);
+                        return { q: `3.14 × ${m}`, a: String(Number((3.14 * m).toFixed(2))) };
+                    });
+                }
+                if (cfg.adv.frac) {
+                    generators.push(() => pickRandom([
+                        { q: "1/2 = 小數?", a: "0.5" }, { q: "1/4 = 小數?", a: "0.25" }, { q: "3/4 = 小數?", a: "0.75" },
+                        { q: "1/5 = 小數?", a: "0.2" }, { q: "2/5 = 小數?", a: "0.4" }, { q: "3/5 = 小數?", a: "0.6" },
+                        { q: "4/5 = 小數?", a: "0.8" }, { q: "1/8 = 小數?", a: "0.125" }, { q: "3/8 = 小數?", a: "0.375" },
+                        { q: "5/8 = 小數?", a: "0.625" }, { q: "7/8 = 小數?", a: "0.875" }, { q: "1/20 = 小數?", a: "0.05" }
+                    ]));
+                }
+                if (cfg.adv.square) {
+                    generators.push(() => { const n = randInt(2, 20); return { q: `${n}² = ?`, a: String(n * n) }; });
+                }
+            }
+
+            if (generators.length === 0) {
+                const a = randInt(2, 9), b = randInt(2, 9);
+                return { q: `${a} × ${b}`, a: String(a * b) };
+            }
+            return pickRandom(generators)();
+        }
+
+        function getTopicSummaryText(cfg) {
+            const parts = [];
+            if (cfg.addsub && cfg.addsub.enabled) parts.push(`加減(≤${cfg.addsub.max1})`);
+            if (cfg.muldiv && cfg.muldiv.enabled) parts.push("乘除");
+            if (cfg.mix && cfg.mix.enabled) parts.push("四則巧算");
+            if (cfg.adv && cfg.adv.enabled) parts.push("高年級專區");
+            return parts.length ? parts.join("+") : "九九乘法";
+        }
+
+        function openTeacherStep1Modal() {
+            const input = document.getElementById('teacher-pin-modal-input');
+            input.value = '';
+            document.getElementById('teacher-login-modal').style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        }
+        function openTeacherLoginModal() { openTeacherStep1Modal(); }
+        function closeTeacherModal() {
+            document.getElementById('teacher-login-modal').style.display = 'none';
+            document.getElementById('teacher-room-modal').style.display = 'none';
+        }
+        function switchRoomModalMode(mode) {
+            const isCreate = (mode === 'create');
+            document.getElementById('room-modal-create-panel').style.display = isCreate ? 'block' : 'none';
+            document.getElementById('room-modal-maintain-panel').style.display = isCreate ? 'none' : 'block';
+            document.getElementById('tab-room-mode-create').classList.toggle('active', isCreate);
+            document.getElementById('tab-room-mode-maintain').classList.toggle('active', !isCreate);
+            if (!isCreate) {
+                const cur = (document.getElementById('login-code').value.trim() || "00000").padStart(5, '0');
+                if (!document.getElementById('maintain-room-code-input').value) {
+                    document.getElementById('maintain-room-code-input').value = cur;
+                }
+            }
+        }
+        function openSwitchRoomModal() {
+            openTeacherRoomModal();
+        }
+        function generateLocalRandomCodes() {
+            const prefixes = ["10", "20", "30", "50", "52", "60", "88"], recs = [];
+            while (recs.length < 3) {
+                const c = pickRandom(prefixes) + String(Math.floor(100 + Math.random() * 899));
+                if (!recs.includes(c)) recs.push(c);
+            }
+            return recs;
+        }
+        async function fetchRecommendedCodes() {
+            const box = document.getElementById('recommended-codes-box');
+            box.innerHTML = '☁️ 正在掃描雲端未使用的 5 位數代碼...';
+            try {
+                const res = await fetch(`${getGasUrl()}?action=getRecommendedCodes&t=${Date.now()}`, { method: 'GET', credentials: 'omit', redirect: 'follow' });
+                const data = await res.json();
+                renderRecommendedBadges((data && data.status === 'success' && data.recommended && data.recommended.length) ? data.recommended : generateLocalRandomCodes());
+            } catch (e) { renderRecommendedBadges(generateLocalRandomCodes()); }
+        }
+        function fetchSuggestedCodes() { return fetchRecommendedCodes(); }
+        function renderRecommendedBadges(list) {
+            const box = document.getElementById('recommended-codes-box');
+            box.innerHTML = `<div style="margin-bottom:4px; font-weight:bold;">💡 系統推薦未使用的可用代碼 (點擊帶入)：</div>` +
+                list.map(c => `<span class="rec-code-badge" onclick="document.getElementById('create-room-code-input').value='${c}'">${c}</span>`).join('');
+            if (!document.getElementById('create-room-code-input').value && list.length > 0) document.getElementById('create-room-code-input').value = list[0];
+        }
+
+        // ================= 🔐 教師專屬通行碼與 5 組額度控管標準模組 =================
+        async function verifyTeacherStep1() {
+            const inputEl = document.getElementById('teacher-pin-modal-input');
+            const pass = inputEl.value.trim();
+            if (!pass) { showToast('⚠️ 請輸入您的教師專屬通行碼！'); return; }
+
+            showToast('☁️ 正在驗證教師通行碼與查詢額度...');
+            try {
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: "verifyTeacherPass", teacherPass: pass })
+                });
+                const data = await res.json();
+                if (data && data.status === 'success' && data.user) {
+                    adminSession.teacherPass = data.user.passCode;
+                    adminSession.teacherName = data.user.name;
+                    adminSession.isSuperAdmin = !!data.user.isSuperAdmin;
+                    adminSession.myRooms = data.myRooms || [];
+                    adminSession.remainingQuota = data.remainingQuota;
+                    adminSession.maxQuota = data.user.maxQuota || 5;
+
+                    document.getElementById('teacher-login-modal').style.display = 'none';
+                    openTeacherRoomModal();
+                } else {
+                    showToast(data.message || '❌ 通行碼無效，請先向阿集老師申請專屬通行碼！');
+                    inputEl.value = '';
+                    inputEl.focus();
+                }
+            } catch (e) {
+                showToast('❌ 驗證連線失敗，請檢查網路狀態');
+            }
+        }
+
+        function openTeacherRoomModal() {
+            const modal = document.getElementById('teacher-room-modal');
+            modal.style.display = 'flex';
+            document.getElementById('create-room-pin-input').value = '';
+            document.getElementById('maintain-room-pin-input').value = '';
+
+            // 動態插入或更新「👋 某某老師您好，剩餘額度 X 組」與「已建代碼一鍵進入按鈕」橫幅
+            let banner = document.getElementById('teacher-quota-status-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'teacher-quota-status-banner';
+                banner.style.cssText = 'background:#eef6ff; border:2px solid #0984e3; border-radius:10px; padding:10px 12px; margin-bottom:12px; text-align:left; font-size:13.5px; line-height:1.5;';
+                const card = modal.querySelector('.small-modal-card');
+                const h2 = card.querySelector('h2');
+                h2.insertAdjacentElement('afterend', banner);
+            }
+
+            const rem = adminSession.remainingQuota !== undefined ? adminSession.remainingQuota : 5;
+            const maxQ = adminSession.maxQuota || 5;
+            const myRooms = adminSession.myRooms || [];
+            const myRoomsHtml = myRooms.length > 0
+                ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #74b9ff;">
+                     <b>📂 您在本遊戲已建立的代碼（點擊可直接免密碼進入修改）：</b><br>
+                     ${myRooms.map(r => `<span class="suggest-chip" style="background:#fff3cd; border-color:#f39c12; color:#d35400;" onclick="quickEnterMyRoom('${r.roomCode}', '${r.roomPin}')">🔑 ${r.roomCode} (${escapeHtml(r.title)})</span>`).join('')}
+                   </div>`
+                : '';
+
+            banner.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                    <span>👋 <b>${escapeHtml(adminSession.teacherName || '老師')}</b> 您好！</span>
+                    <span style="background:${rem > 0 ? '#00b894' : '#e74c3c'}; color:#fff; padding:2px 8px; border-radius:20px; font-weight:900; font-size:12px;">
+                        本遊戲剩餘額度：${rem} / ${maxQ} 組
+                    </span>
+                </div>
+                ${myRoomsHtml}
+            `;
+
+            // 若 5 組額度已滿，自動切換至「維護現有代碼」分頁並鎖定新建按鈕
+            const createBtn = document.getElementById('btn-submit-create-room') || modal.querySelector('#room-modal-create-panel .btn-primary, #room-modal-create-panel .btn-green');
+            if (rem <= 0 && !adminSession.isSuperAdmin) {
+                if (createBtn) {
+                    createBtn.disabled = true;
+                    createBtn.textContent = '🛑 本遊戲 5 組額度已滿 (請維護上方既有代碼)';
+                }
+                switchRoomModalMode('maintain');
+            } else {
+                if (createBtn) {
+                    createBtn.disabled = false;
+                    createBtn.textContent = '✨ 建立代碼並進入後台';
+                }
+                switchRoomModalMode('create');
+                fetchSuggestedCodes();
+            }
+        }
+
+        async function quickEnterMyRoom(code, pin) {
+            document.getElementById('maintain-room-code-input').value = code;
+            document.getElementById('maintain-room-pin-input').value = pin;
+            await submitMaintainRoom();
+        }
+
+        async function submitCreateRoom() {
+            const rawCode = document.getElementById('create-room-code-input').value.trim();
+            if (rawCode.length !== 5) { showToast('⚠️ 請輸入完整的 5 位數字挑戰代碼！'); return; }
+            const code = rawCode.padStart(5, '0');
+            if (code === "00000") { showToast('⚠️ 00000 為系統公開挑戰榜！'); return; }
+            const pin = document.getElementById('create-room-pin-input').value.trim();
+            if (!pin) { showToast('⚠️ 請設定管理密碼！'); return; }
+
+            const defaultCfg = getDefaultParams();
+            defaultCfg.roomPin = pin;
+            showToast(`☁️ 正在建立代碼 [${code}]...`);
+            try {
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: "createNewRoom", roomCode: code, teacherPin: pin,
+                        teacherPass: adminSession.teacherPass || "", config: defaultCfg
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast(data.message);
+                    enterAdminDashboard(code, pin, !!adminSession.isSuperAdmin, defaultCfg);
+                } else {
+                    showToast(data.message || '建立失敗');
+                }
+            } catch (e) {
+                showToast('❌ 連線失敗');
+            }
+        }
+
+        async function submitMaintainRoom() {
+            const code = (document.getElementById('maintain-room-code-input').value.trim() || "00000").padStart(5, '0');
+            const pin = document.getElementById('maintain-room-pin-input').value.trim();
+            try {
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: "verifyRoomPin", roomCode: code, teacherPin: pin,
+                        teacherPass: adminSession.teacherPass || ""
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast(data.message);
+                    const loadedCfg = data.config ? Object.assign(getDefaultParams(), data.config) : getDefaultParams();
+                    enterAdminDashboard(code, data.roomPin || pin, !!data.isSuperAdmin || !!adminSession.isSuperAdmin, loadedCfg);
+                } else {
+                    showToast(data.message || '驗證失敗');
+                }
+            } catch (e) {
+                showToast('❌ 驗證連線失敗');
+            }
+        }
+
+        function enterAdminDashboard(code, pin, isSuperAdmin, cfgObj) {
+            return enterAdminBackend(code, pin, isSuperAdmin, cfgObj);
+        }
+
+        function enterAdminBackend(code, pin, isSuperAdmin, cfgObj) {
+            closeTeacherModal();
+            adminSession.roomCode = code;
+            adminSession.pin = pin;
+            adminSession.isSuperAdmin = isSuperAdmin;
+            document.getElementById('locked-code-badge').innerText = isSuperAdmin ? `👑 最高管理員：[${code}]` : `🔒 當前管理代碼：[${code}]`;
+            document.getElementById('record-box-code-label').innerText = `[${code}]`;
+            document.getElementById('tab-btn-api').style.display = isSuperAdmin ? 'inline-block' : 'none';
+            if (!isSuperAdmin && document.getElementById('tab-btn-api').classList.contains('active')) switchAdminTab('records');
+            currentConfig = cfgObj || getDefaultConfig();
+            loadConfigToUI(currentConfig);
+            showScreen('settings-screen');
+            fetchTeacherRecords();
+        }
+        function exitAdminToHome() { document.getElementById('login-code').value = adminSession.roomCode; showScreen('home-screen'); }
+
+        function applyPreset(name) {
+            let c = getDefaultConfig();
+            if (name === 'default_99') c.title = "九九乘法基礎特訓";
+            else if (name === 'g1_addsub') { c.title = "小一：20以內加減特訓"; c.speed = 1; c.addsub = { enabled: true, add: true, sub: true, max1: 20, max2: 10, carryMode: "random" }; c.muldiv.enabled = false; }
+            else if (name === 'g2_carry') { c.title = "小二：百以內必進退位加減"; c.speed = 2; c.addsub = { enabled: true, add: true, sub: true, max1: 99, max2: 99, carryMode: "force_carry" }; c.muldiv.enabled = false; }
+            else if (name === 'g3_muldiv') { c.title = "小三：乘除整除與求餘數"; c.speed = 2; c.muldiv = { enabled: true, mul99: true, tables: [4,6,7,8,9], mul2d1d: true, mul2dMax: 35, mulRound: true, divBasic: true, div2d1d: false, divRem: true }; }
+            else if (name === 'g4_mix') { c.title = "小四：四則混合與湊百巧算"; c.speed = 2; c.muldiv.enabled = false; c.mix = { enabled: true, make100: true, golden: true, order: true, unknown: true }; }
+            else if (name === 'g56_adv') { c.title = "高年級：小數、分數與 3.14 特訓"; c.speed = 2; c.muldiv.enabled = false; c.adv = { enabled: true, decAddSub: true, decMul: true, pi: true, frac: true, square: true }; }
+            loadConfigToUI(c);
+            showToast(`✨ 已套用範本：「${c.title}」！`);
+        }
+
+        function loadConfigToUI(c) {
+            document.getElementById('cfg-title').value = c.title || "心算特訓";
+            document.getElementById('cfg-input-mode').value = c.inputMode || "auto";
+            document.getElementById('cfg-target').value = c.targetScore || 100;
+            document.getElementById('cfg-time').value = c.time || 300;
+            document.getElementById('cfg-speed').value = c.speed || 2;
+            document.getElementById('cfg-max-meteors').value = c.maxMeteors || 2;
+            document.getElementById('cfg-adaptive').checked = c.adaptive !== false;
+            document.getElementById('cfg-pause').checked = c.allowPause !== false;
+            document.getElementById('cfg-voice').checked = c.enableVoice !== false;
+            document.getElementById('set-list-home').checked = c.listOnHome === true;   // 預設不公開
+
+            const as = c.addsub || {};
+            document.getElementById('mod-addsub-enable').checked = !!as.enabled;
+            document.getElementById('addsub-op-add').checked = as.add !== false;
+            document.getElementById('addsub-op-sub').checked = as.sub !== false;
+            document.getElementById('addsub-max1').value = as.max1 || 99;
+            document.getElementById('addsub-max2').value = as.max2 || 99;
+            document.getElementById('addsub-carry-mode').value = as.carryMode || "random";
+
+            const md = c.muldiv || {};
+            document.getElementById('mod-muldiv-enable').checked = md.enabled !== false;
+            document.getElementById('mul-99-enable').checked = md.mul99 !== false;
+            const tables = md.tables || [2,3,4,5,6,7,8,9];
+            document.querySelectorAll('#mul-99-chips .num-chip').forEach(chip => {
+                chip.classList.toggle('selected', tables.includes(Number(chip.getAttribute('data-val'))));
+            });
+            document.getElementById('mul-2d1d-enable').checked = !!md.mul2d1d;
+            document.getElementById('mul-2d-max').value = md.mul2dMax || 50;
+            document.getElementById('lbl-mul-2d').innerText = md.mul2dMax || 50;
+            document.getElementById('mul-round-enable').checked = !!md.mulRound;
+            document.getElementById('div-basic-enable').checked = !!md.divBasic;
+            document.getElementById('div-2d1d-enable').checked = !!md.div2d1d;
+            document.getElementById('div-rem-enable').checked = !!md.divRem;
+
+            const mx = c.mix || {};
+            document.getElementById('mod-mix-enable').checked = !!mx.enabled;
+            document.getElementById('mix-make100').checked = mx.make100 !== false;
+            document.getElementById('mix-golden').checked = !!mx.golden;
+            document.getElementById('mix-order').checked = mx.order !== false;
+            document.getElementById('mix-unknown').checked = mx.unknown !== false;
+
+            const ad = c.adv || {};
+            document.getElementById('mod-adv-enable').checked = !!ad.enabled;
+            document.getElementById('adv-dec-addsub').checked = ad.decAddSub !== false;
+            document.getElementById('adv-dec-mul').checked = !!ad.decMul;
+            document.getElementById('adv-pi').checked = ad.pi !== false;
+            document.getElementById('adv-frac').checked = !!ad.frac;
+            document.getElementById('adv-square').checked = !!ad.square;
+
+            updateGlobalLabels(); updateAddSubLabels(); onModuleToggle();
+        }
+
+        function readConfigFromUI() {
+            const tables = [];
+            document.querySelectorAll('#mul-99-chips .num-chip.selected').forEach(ch => tables.push(Number(ch.getAttribute('data-val'))));
+            return {
+                title: document.getElementById('cfg-title').value.trim() || "心算特訓",
+                roomPin: adminSession.pin,
+                inputMode: document.getElementById('cfg-input-mode').value,
+                targetScore: Number(document.getElementById('cfg-target').value) || 100,
+                time: Number(document.getElementById('cfg-time').value) || 300,
+                speed: Number(document.getElementById('cfg-speed').value) || 2,
+                maxMeteors: Number(document.getElementById('cfg-max-meteors').value) || 2,
+                adaptive: document.getElementById('cfg-adaptive').checked,
+                allowPause: document.getElementById('cfg-pause').checked,
+                enableVoice: document.getElementById('cfg-voice').checked,
+                listOnHome: document.getElementById('set-list-home').checked,
+                displayName: document.getElementById('cfg-title').value.trim() || "心算特訓",
+                gameType: "math",
+                addsub: {
+                    enabled: document.getElementById('mod-addsub-enable').checked,
+                    add: document.getElementById('addsub-op-add').checked,
+                    sub: document.getElementById('addsub-op-sub').checked,
+                    max1: Number(document.getElementById('addsub-max1').value) || 99,
+                    max2: Number(document.getElementById('addsub-max2').value) || 99,
+                    carryMode: document.getElementById('addsub-carry-mode').value
+                },
+                muldiv: {
+                    enabled: document.getElementById('mod-muldiv-enable').checked,
+                    mul99: document.getElementById('mul-99-enable').checked,
+                    tables: tables.length ? tables : [2,3,4,5,6,7,8,9],
+                    mul2d1d: document.getElementById('mul-2d1d-enable').checked,
+                    mul2dMax: Number(document.getElementById('mul-2d-max').value) || 50,
+                    mulRound: document.getElementById('mul-round-enable').checked,
+                    divBasic: document.getElementById('div-basic-enable').checked,
+                    div2d1d: document.getElementById('div-2d1d-enable').checked,
+                    divRem: document.getElementById('div-rem-enable').checked
+                },
+                mix: {
+                    enabled: document.getElementById('mod-mix-enable').checked,
+                    make100: document.getElementById('mix-make100').checked,
+                    golden: document.getElementById('mix-golden').checked,
+                    order: document.getElementById('mix-order').checked,
+                    unknown: document.getElementById('mix-unknown').checked
+                },
+                adv: {
+                    enabled: document.getElementById('mod-adv-enable').checked,
+                    decAddSub: document.getElementById('adv-dec-addsub').checked,
+                    decMul: document.getElementById('adv-dec-mul').checked,
+                    pi: document.getElementById('adv-pi').checked,
+                    frac: document.getElementById('adv-frac').checked,
+                    square: document.getElementById('adv-square').checked
+                }
+            };
+        }
+
+        function updateGlobalLabels() {
+            const target = Number(document.getElementById('cfg-target').value);
+            document.getElementById('lbl-target').innerText = `${target} 分 (約 ${Math.ceil(target / 12)} 題)`;
+            const sec = Number(document.getElementById('cfg-time').value);
+            const m = Math.floor(sec / 60), s = sec % 60;
+            document.getElementById('lbl-time').innerText = `${m} 分鐘 ${s > 0 ? s + '秒' : ''} (${sec}秒)`;
+            const spd = Number(document.getElementById('cfg-speed').value);
+            document.getElementById('lbl-speed').innerText = `速度 ${spd} ${spd <= 3 ? '(超慢速思考)' : (spd <= 8 ? '(放慢4倍適中)' : '(🔥極速挑戰)')}`;
+            const mm = Number(document.getElementById('cfg-max-meteors').value);
+            document.getElementById('lbl-max-meteors').innerText = `最多 ${mm} 題 ${mm <= 2 ? '(推薦專注)' : '(多工挑戰)'}`;
+        }
+        function updateAddSubLabels() {
+            document.getElementById('lbl-addsub-max1').innerText = `1 ~ ${document.getElementById('addsub-max1').value}`;
+            document.getElementById('lbl-addsub-max2').innerText = `1 ~ ${document.getElementById('addsub-max2').value}`;
+            updateLivePreview();
+        }
+        function setSlider(id, val) { document.getElementById(id).value = val; updateAddSubLabels(); }
+        function toggleChip(el) { el.classList.toggle('selected'); updateLivePreview(); }
+        function onModuleToggle() {
+            ['addsub', 'muldiv', 'mix', 'adv'].forEach(k => {
+                document.getElementById(`mod-card-${k}`).classList.toggle('enabled', document.getElementById(`mod-${k}-enable`).checked);
+            });
+            updateLivePreview();
+        }
+        function updateLivePreview() {
+            const cfg = readConfigFromUI(), container = document.getElementById('live-preview-list');
+            container.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                const item = generateMathQuestion(cfg, 0), hint = buildScaffoldHint(item.q);
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `${escapeHtml(item.q)} ➔ <span>${escapeHtml(item.a)}</span> <small style="color:#00ffcc; display:block; font-size:12px;">${escapeHtml(hint)}</small>`;
+                container.appendChild(div);
+            }
+        }
+        async function saveRoomConfigToCloud() {
+            const cfg = readConfigFromUI(); currentConfig = cfg;
+            showToast(`☁️ 正在發布設定至代碼 [${adminSession.roomCode}]...`);
+            try {
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: "saveRoomConfig", roomCode: adminSession.roomCode, teacherPin: adminSession.pin, teacherPass: adminSession.teacherPass || "", config: cfg })
+                });
+                const data = await res.json();
+                showToast(data.message || '☁️ 已成功發布設定至雲端代碼！');
+            } catch (e) { showToast('❌ 發布失敗'); }
+        }
+
+        function switchAdminTab(tabName) {
+            ['records', 'tasks', 'api'].forEach(t => {
+                document.getElementById('tab-btn-' + t).classList.toggle('active', t === tabName);
+                document.getElementById('admin-panel-' + t).classList.toggle('active', t === tabName);
+            });
+        }
+
+        async function fetchTeacherRecords() {
+            const code = adminSession.roomCode;
+            const summaryEl = document.getElementById('admin-record-summary');
+            const tbody = document.getElementById('admin-records-tbody');
+            summaryEl.innerText = `☁️ 正在讀取 [${code}] 資料...`;
+            tbody.innerHTML = `<tr><td colspan="10" style="padding:25px;">☁️ 正在從試算表調閱紀錄...</td></tr>`;
+            try {
+                const res = await fetch(`${getGasUrl()}?action=getTeacherRecords&roomCode=${encodeURIComponent(code)}&t=${Date.now()}`, { method: 'GET', credentials: 'omit', redirect: 'follow' });
+                const data = await res.json();
+                if (data && data.status === 'success') {
+                    cachedTeacherData = {
+                        roomCode: code,
+                        leaderboard: (data.leaderboard || []).map(unpackLogRecord),
+                        allLogs: (data.allLogs || []).map(unpackLogRecord)
+                    };
+                    renderTeacherTable();
+                } else summaryEl.innerText = "❌ 讀取失敗";
+            } catch (e) { summaryEl.innerText = "❌ 連線失敗"; }
+        }
+
+        function renderTeacherTable() {
+            const mode = document.getElementById('admin-view-mode').value;
+            const thead = document.getElementById('admin-records-thead'), tbody = document.getElementById('admin-records-tbody');
+            const code = cachedTeacherData.roomCode;
+            document.getElementById('admin-record-summary').innerText = `代碼 [${code}]：不重複學生 ${cachedTeacherData.leaderboard.length} 人 ｜ 總練習 ${cachedTeacherData.allLogs.length} 人次`;
+
+            if (mode === 'all_logs') {
+                thead.innerHTML = `<tr><th>序號</th><th>挑戰時間</th><th>座號</th><th>姓名</th><th>總分</th><th>答對/失誤</th><th>連擊</th><th>耗時</th><th>題型摘要</th><th>錯題診斷紀錄</th></tr>`;
+                const logs = cachedTeacherData.allLogs;
+                if (!logs.length) { tbody.innerHTML = `<tr><td colspan="10" style="padding:25px; color:#7f8c8d;">此代碼 [${code}] 尚無練習紀錄</td></tr>`; return; }
+                tbody.innerHTML = logs.map((r, i) => {
+                    const isClean = !r.wrongDetails || r.wrongDetails === '無' || r.wrongDetails === '全對無失誤';
+                    return `<tr>
+                        <td>#${logs.length - i}</td><td style="font-size:12px;">${escapeHtml(r.timestamp)}</td>
+                        <td>${escapeHtml(r.seatNo)}</td><td style="font-weight:bold;">${escapeHtml(r.playerName)}</td>
+                        <td style="color:#e74c3c; font-weight:900;">${r.score}</td>
+                        <td><span style="color:#27ae60; font-weight:bold;">${r.correctCount}</span> / <span style="color:#c0392b;">${r.wrongCount}</span></td>
+                        <td>🔥 ${r.maxCombo}</td><td>${r.durationSeconds}s</td>
+                        <td style="font-size:12px;">${escapeHtml(r.topicSummary || '')}</td>
+                        <td style="font-size:12px; color:${isClean ? '#27ae60' : '#c0392b'}; font-weight:bold; text-align:left; max-width:250px;">${escapeHtml(r.wrongDetails || '全對無失誤')}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                thead.innerHTML = `<tr><th>排行</th><th>座號</th><th>姓名</th><th>最高總分</th><th>最佳答對/失誤</th><th>最高連擊</th><th>練習次數</th><th>防衛武裝</th><th>達成時間</th></tr>`;
+                let list = cachedTeacherData.leaderboard.slice();
+                if (mode === 'best_seat') list.sort((a, b) => (parseInt(a.seatNo) || 9999) - (parseInt(b.seatNo) || 9999));
+                if (!list.length) { tbody.innerHTML = `<tr><td colspan="9" style="padding:25px; color:#7f8c8d;">此代碼 [${code}] 尚無學生紀錄</td></tr>`; return; }
+                tbody.innerHTML = list.map((r, i) => `<tr>
+                    <td>${mode === 'best_score' ? (i === 0 ? '🥇 1' : (i === 1 ? '🥈 2' : (i === 2 ? '🥉 3' : i + 1))) : (i + 1)}</td>
+                    <td style="font-weight:900; color:#0984e3;">${escapeHtml(r.seatNo)}</td>
+                    <td style="font-weight:bold;">${escapeHtml(r.playerName)}</td>
+                    <td style="color:#e74c3c; font-weight:900; font-size:16px;">${r.score}</td>
+                    <td><span style="color:#27ae60; font-weight:bold;">${r.correctCount}</span> / <span style="color:#c0392b;">${r.wrongCount}</span></td>
+                    <td>🔥 ${r.maxCombo}</td><td style="font-weight:bold; color:#8e44ad;">${r.attempts} 次</td>
+                    <td style="font-size:13px;">${escapeHtml(r.rankTitle)}</td><td style="font-size:12px;">${escapeHtml(r.timestamp)}</td>
+                </tr>`).join('');
+            }
+        }
+
+        function classifyMathErrorCategory(expr) {
+            const q = expr.trim();
+            if (q.includes('□')) return "❓ 未知數逆運算填空";
+            if (q.includes('餘')) return "➗ 有餘數除法 (求餘數)";
+            if ((q.includes('+') || q.includes('-')) && (q.includes('×') || q.includes('÷'))) return "⚖️ 四則混合 (先乘除後加減)";
+            if (q.includes('3.14')) return "⭕ 圓周率 3.14 倍數計算";
+            if (q.includes('²')) return "² 完全平方數概念";
+            if (q.includes('/')) return "🍰 常用分數化小數";
+            if (q.includes('.')) return "💧 小數四則心算";
+            if (q.includes('÷')) return "➗ 整數除法逆運算";
+            if (q.includes('×')) {
+                const m = q.match(/(\d+)\s*×\s*(\d+)/);
+                if (m && Number(m[1]) <= 9 && Number(m[2]) <= 9) return "✖️ 九九乘法表熟練度";
+                return "✖️ 多位數與整十乘法";
+            }
+            if (q.includes('+')) return "➕ 整數加法與進位湊十";
+            if (q.includes('-')) return "➖ 整數減法與退位拆解";
+            return "🔢 綜合數感心算";
+        }
+
+        function openDiagnosticModal() {
+            const logs = cachedTeacherData.allLogs || [];
+            const box = document.getElementById('diagnostic-report-content');
+            document.getElementById('diagnostic-modal').style.display = 'flex';
+            if (logs.length === 0) {
+                box.innerHTML = `<div style="padding:30px; color:#7f8c8d; font-weight:bold;">⚠️ 目前代碼 [${cachedTeacherData.roomCode}] 尚無練習紀錄可供統計分析。</div>`;
+                return;
+            }
+            let totalCorrect = 0, totalWrong = 0, totalDuration = 0, calcErrorCount = 0, timeoutCount = 0;
+            const categoryCounts = {}, expressionMap = {}, studentStats = {};
+
+            logs.forEach(r => {
+                totalCorrect += Number(r.correctCount) || 0;
+                totalWrong += Number(r.wrongCount) || 0;
+                totalDuration += Number(r.durationSeconds) || 0;
+                const stKey = `${r.seatNo !== '-' ? r.seatNo + '號 ' : ''}${r.playerName}`;
+                if (!studentStats[stKey]) studentStats[stKey] = { name: stKey, sessions: 0, correct: 0, wrong: 0, wrongItems: [] };
+                studentStats[stKey].sessions++;
+                studentStats[stKey].correct += Number(r.correctCount) || 0;
+                studentStats[stKey].wrong += Number(r.wrongCount) || 0;
+
+                const wStr = String(r.wrongDetails || "").trim();
+                if (wStr && wStr !== "無" && wStr !== "全對無失誤") {
+                    wStr.split(/\s*,\s*/).filter(Boolean).forEach(rawItem => {
+                        studentStats[stKey].wrongItems.push(rawItem);
+                        const m = rawItem.match(/^(.+?)\((.+?)\)$/);
+                        const expr = m ? m[1].trim() : rawItem.trim();
+                        const detail = m ? m[2].trim() : "失誤";
+                        if (detail.includes("逾時") || detail.includes("漏接") || detail.includes("重修")) timeoutCount++;
+                        else calcErrorCount++;
+                        const cat = classifyMathErrorCategory(expr);
+                        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+                        if (!expressionMap[expr]) expressionMap[expr] = { expr: expr, count: 0, details: [], cat: cat };
+                        expressionMap[expr].count++;
+                        if (expressionMap[expr].details.length < 5) expressionMap[expr].details.push(detail);
+                    });
+                }
+            });
+
+            const totalQuestions = totalCorrect + totalWrong;
+            const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 100;
+            const avgSpeedPerQ = totalCorrect > 0 ? (totalDuration / totalCorrect).toFixed(1) : "-";
+            const sortedCats = Object.keys(categoryCounts).map(k => ({ cat: k, count: categoryCounts[k] })).sort((a, b) => b.count - a.count);
+            const totalRecordedErrors = sortedCats.reduce((acc, c) => acc + c.count, 0);
+            const sortedExprs = Object.values(expressionMap).sort((a, b) => b.count - a.count).slice(0, 8);
+            const needHelpStudents = Object.values(studentStats)
+                .filter(s => s.wrong >= 2 || (s.correct + s.wrong > 0 && (s.correct / (s.correct + s.wrong)) < 0.78))
+                .sort((a, b) => b.wrong - a.wrong);
+
+            let prescriptionHtml = "";
+            if (totalRecordedErrors === 0 && totalWrong === 0) {
+                prescriptionHtml = `🎉 <b>全班表現極為優異！</b>目前所有練習皆維持高準確率，建議可調高「過關目標分數」或開啟「四則混合 / 未知數填空」進行加深挑戰。`;
+            } else {
+                const topCat = sortedCats.length > 0 ? sortedCats[0].cat : "基礎四則";
+                const errorTypeRatio = calcErrorCount >= timeoutCount
+                    ? `全班失誤以<b>「概念或進退位算錯 (${calcErrorCount}次)」</b>為主（高於逾時未算完的 ${timeoutCount} 次），代表心算拆解步驟尚不穩定。`
+                    : `全班失誤以<b>「思考逾時重修 (${timeoutCount}次)」</b>為主（高於算錯的 ${calcErrorCount} 次），代表心算提取速度較慢，建議將速度調為<b>「速度 1 ~ 2」</b>並鼓勵使用「❄️ 冰封提示」。`;
+                prescriptionHtml = `<div style="line-height:1.65; font-size:14px;">1. <b>失誤型態診斷</b>：${errorTypeRatio}<br>2. <b>優先補救單元</b>：全班最常卡關的題型為 <b style="color:#c0392b;">【${escapeHtml(topCat)}】</b>，建議課堂前 3 分鐘針對下方「高頻率魔王錯題」進行拆解示範。</div>`;
+            }
+
+            box.innerHTML = `
+                <div class="diag-grid">
+                    <div class="diag-stat-card"><div class="title">📊 全班平均心算精準度</div><div class="val" style="color:${overallAccuracy >= 85 ? '#00b894' : '#e17055'};">${overallAccuracy}% <span style="font-size:13px; font-weight:normal;">(對${totalCorrect}/錯${totalWrong})</span></div></div>
+                    <div class="diag-stat-card" style="border-left-color:#00b894;"><div class="title">⏱️ 平均每題心算反應時間</div><div class="val">${avgSpeedPerQ} 秒/題</div></div>
+                    <div class="diag-stat-card" style="border-left-color:#e74c3c;"><div class="title">❌ 算錯誤答 vs 🐢 逾時重修</div><div class="val" style="font-size:18px;">誤答 ${calcErrorCount} 次 ｜ 逾時 ${timeoutCount} 次</div></div>
+                </div>
+                <div class="diag-section" style="background:#fffdf2; border-color:#f6d365;"><h4>💡 AI 教學診斷與課堂補救教學處方建議</h4>${prescriptionHtml}</div>
+                <div class="diag-section">
+                    <h4>📉 班級易錯題型單元分佈（依錯題頻率排序）</h4>
+                    ${sortedCats.length === 0 ? '<div style="color:#7f8c8d; font-size:13px;">尚無新版詳細錯題字串紀錄（再進行一場練習即可自動收集！）</div>' :
+                      sortedCats.map(c => {
+                          const pct = Math.round((c.count / Math.max(1, totalRecordedErrors)) * 100);
+                          return `<div class="bar-row"><span style="width:190px; text-align:left;">${escapeHtml(c.cat)}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;"></div></div><span style="width:90px; text-align:right; color:#c0392b;">${c.count} 題 (${pct}%)</span></div>`;
+                      }).join('')}
+                </div>
+                <div class="diag-section">
+                    <h4>🔥 全班高頻率魔王錯題 Top 8（課堂黑板檢討首選）</h4>
+                    ${sortedExprs.length === 0 ? '<div style="color:#7f8c8d; font-size:13px;">目前尚無個別算式錯誤紀錄。</div>' :
+                      `<table><thead><tr><th>排名</th><th>易錯算式</th><th>所屬概念單元</th><th>錯誤次數</th><th>學生常見迷思 / 誤答紀錄</th></tr></thead><tbody>
+                      ${sortedExprs.map((item, idx) => `<tr><td style="font-weight:900; color:#c0392b;">Top ${idx + 1}</td><td style="font-weight:900; font-size:16px; color:#2c3e50;">${escapeHtml(item.expr)}</td><td>${escapeHtml(item.cat)}</td><td style="font-weight:bold; color:#e74c3c;">${item.count} 次</td><td style="text-align:left; font-size:13px; color:#555;">${escapeHtml(item.details.join('、'))}</td></tr>`).join('')}
+                      </tbody></table>`}
+                </div>
+                <div class="diag-section">
+                    <h4>🧑‍🏫 個別學生補救教學關懷名單（篩選失誤 ≥ 2 次或準確率 &lt; 78% 之學生）</h4>
+                    ${needHelpStudents.length === 0 ? '<div style="color:#27ae60; font-weight:bold; font-size:14px;">✅ 目前所有學生準確率皆良好，無須特別補救名單！</div>' :
+                      `<table><thead><tr><th>學生 (座號/姓名)</th><th>練習次數</th><th>總答對 / 總失誤</th><th>精準度</th><th>該生待加強算式與錯題紀錄</th></tr></thead><tbody>
+                      ${needHelpStudents.map(st => {
+                          const acc = Math.round((st.correct / Math.max(1, st.correct + st.wrong)) * 100);
+                          const uniqueWrongs = Array.from(new Set(st.wrongItems)).slice(0, 6);
+                          return `<tr><td style="font-weight:900; color:#0984e3;">${escapeHtml(st.name)}</td><td>${st.sessions} 次</td><td><span style="color:#27ae60; font-weight:bold;">${st.correct}</span> / <span style="color:#c0392b; font-weight:bold;">${st.wrong}</span></td><td style="font-weight:900; color:${acc < 65 ? '#e74c3c' : '#e67e22'};">${acc}%</td><td style="text-align:left; font-size:12px; color:#c0392b; font-weight:bold;">${uniqueWrongs.length ? escapeHtml(uniqueWrongs.join(' 、 ')) : '舊版紀錄無算式明細'}</td></tr>`;
+                      }).join('')}
+                      </tbody></table>`}
+                </div>`;
+        }
+
+        function exportRecordsCSV() {
+            const mode = document.getElementById('admin-view-mode').value, code = cachedTeacherData.roomCode;
+            let csv = "\uFEFF";
+            if (mode === 'all_logs') {
+                if (!cachedTeacherData.allLogs.length) { showToast('⚠️ 無資料可匯出'); return; }
+                csv += "挑戰時間,挑戰代碼,座號,姓名,總分,答對題數,失誤次數,最高連擊,使用秒數,武裝稱號,題型摘要,錯題診斷紀錄\n";
+                cachedTeacherData.allLogs.forEach(r => {
+                    csv += `"${r.timestamp}","'${r.roomCode}","'${r.seatNo}","${r.playerName}",${r.score},${r.correctCount},${r.wrongCount},${r.maxCombo},${r.durationSeconds},"${r.rankTitle}","${r.topicSummary || ''}","${r.wrongDetails || ''}"\n`;
+                });
+            } else {
+                if (!cachedTeacherData.leaderboard.length) { showToast('⚠️ 無資料可匯出'); return; }
+                let list = cachedTeacherData.leaderboard.slice();
+                if (mode === 'best_seat') list.sort((a, b) => (parseInt(a.seatNo) || 9999) - (parseInt(b.seatNo) || 9999));
+                csv += "座號,姓名,最高總分,最佳答對,失誤次數,最高連擊,練習次數,最佳武裝,達成時間\n";
+                list.forEach(r => {
+                    csv += `"'${r.seatNo}","${r.playerName}",${r.score},${r.correctCount},${r.wrongCount},${r.maxCombo},${r.attempts},"${r.rankTitle}","${r.timestamp}"\n`;
+                });
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            a.download = `星際心算_代碼${code}_${mode === 'all_logs' ? '完整歷程' : '最高分成績單'}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        function openClearConfirmModal() {
+            document.getElementById('clear-modal-desc').innerText = `確定要永久清空代碼 [${adminSession.roomCode}] 的所有學生成績紀錄嗎？`;
+            document.getElementById('clear-confirm-modal').style.display = 'flex';
+        }
+        async function executeClearRoomRecords() {
+            document.getElementById('clear-confirm-modal').style.display = 'none';
+            showToast(`☁️ 正在清空代碼 [${adminSession.roomCode}] 紀錄...`);
+            try {
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: "clearRoomScores", roomCode: adminSession.roomCode, teacherPin: adminSession.pin, teacherPass: adminSession.teacherPass || "" })
+                });
+                const data = await res.json();
+                showToast(data.message || '操作完成');
+                if (data.status === 'success') fetchTeacherRecords();
+            } catch (e) { showToast('❌ 清空失敗'); }
+        }
+
+        // === 🌟 雲端連線穩定性（方向 A + 方向 B）與非 00000 錯誤代碼嚴格攔截 ===
+        // ================= 🏁 v2.0 大螢幕輪流接力 =================
+        let playMode = 'solo', relaySession = [];
+        function setPlayMode(mode) {
+            playMode = (mode === 'relay') ? 'relay' : 'solo';
+            document.getElementById('mode-btn-solo').classList.toggle('on', playMode === 'solo');
+            document.getElementById('mode-btn-relay').classList.toggle('on', playMode === 'relay');
+            try { localStorage.setItem('MD_PLAY_MODE', playMode); } catch (e) {}
+            if (playMode === 'relay') relaySession = [];
+            document.getElementById('start-btn').innerText = playMode === 'relay' ? '▶️ 第一位同學出發！' : '▶️ 載入心算任務並發射升空';
+        }
+        function recordRelayResult(finalScore) {
+            const box = document.getElementById('relay-box'), btn = document.getElementById('relay-next-btn');
+            if (playMode !== 'relay') { box.style.display = 'none'; btn.style.display = 'none'; return; }
+            relaySession.push({ seat: currentStudent.seatNo, name: currentStudent.playerName, score: finalScore, correct: correctCount, wrong: wrongCount, combo: maxCombo, time: timeUsed });
+            const ranked = relaySession.slice().sort((a, b) => b.score - a.score || a.time - b.time);
+            box.innerHTML = `<div style="font-weight:900; color:#d35400;">🏁 本場接力排名（共 ${relaySession.length} 位）</div>
+                <table class="relay-rank"><thead><tr><th>名次</th><th>座號</th><th>姓名</th><th>總分</th><th>對/錯</th><th>耗時</th></tr></thead><tbody>
+                ${ranked.map((r, i) => `<tr${r === relaySession[relaySession.length - 1] ? ' style="background:#d4efdf; font-weight:900;"' : ''}><td>${i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : i + 1))}</td><td>${escapeHtml(r.seat)}</td><td>${escapeHtml(r.name)}</td><td style="color:#e74c3c; font-weight:900;">${r.score}</td><td>${r.correct}/${r.wrong}</td><td>${r.time}s</td></tr>`).join('')}
+                </tbody></table>`;
+            box.style.display = 'block'; btn.style.display = 'inline-block';
+        }
+        function openRelayNext() {
+            document.getElementById('relay-seat').value = '';
+            document.getElementById('relay-name').value = '';
+            document.getElementById('relay-next-desc').innerText = `代碼 [${currentStudent.roomCode}]「${currentConfig.title || '心算特訓'}」・已完成 ${relaySession.length} 位，成績各自上傳。`;
+            document.getElementById('relay-next-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('relay-name').focus(), 60);
+        }
+        function startNextRelayPlayer() {
+            const name = document.getElementById('relay-name').value.trim();
+            if (!name) { showToast('⚠️ 請輸入下一位同學的名字'); document.getElementById('relay-name').focus(); return; }
+            currentStudent = { roomCode: currentStudent.roomCode, seatNo: document.getElementById('relay-seat').value.trim() || '-', playerName: name };
+            document.getElementById('relay-next-modal').style.display = 'none';
+            showScreen('game-screen'); startGameFlow();
+        }
+
+        function startOfflinePractice() {
+            document.getElementById('conn-error-modal').style.display = 'none';
+            currentConfig = getDefaultParams();
+            showToast('🎮 已載入單機離線練習題庫！');
+            showScreen('game-screen');
+            startGameFlow();
+        }
+
+        async function startCloudGame() {
+            const codeInput = (document.getElementById('login-code').value.trim() || "00000").padStart(5, '0');
+            document.getElementById('login-code').value = codeInput;
+            const seatInput = document.getElementById('login-seat').value.trim() || "-";
+            const nameInput = document.getElementById('login-name').value.trim();
+            if (!nameInput) { showToast('⚠️ 請先輸入您的「姓名或暱稱」喔！'); document.getElementById('login-name').focus(); return; }
+            currentStudent = { roomCode: codeInput, seatNo: seatInput, playerName: nameInput };
+            relaySession = [];
+            try {
+                localStorage.setItem('MD_CODE', codeInput);
+                localStorage.setItem('MD_SEAT', seatInput === "-" ? "" : seatInput);
+                localStorage.setItem('MD_NAME', nameInput);
+            } catch (e) {}
+
+            const startBtn = document.getElementById('start-btn');
+            startBtn.classList.add('disabled'); startBtn.innerText = '☁️ 正在載入代碼心算設定...';
+            try {
+                const res = await fetch(`${getGasUrl()}?action=getRoomConfig&roomCode=${encodeURIComponent(codeInput)}&t=${Date.now()}`, {
+                    method: 'GET', credentials: 'omit', redirect: 'follow'
+                });
+                const data = await res.json();
+                const hasValidConfig = data && data.status === 'success' && data.config &&
+                    (data.config.addsub || data.config.muldiv || data.config.mix || data.config.adv || (data.config.tasks && data.config.tasks.length > 0));
+
+                if (hasValidConfig) {
+                    currentConfig = Object.assign(getDefaultParams(), data.config);
+                    showToast(`📥 已載入代碼 [${codeInput}]：${currentConfig.title}`);
+                    showScreen('game-screen');
+                    startGameFlow();
+                } else {
+                    if (codeInput !== "00000") {
+                        showToast('❌ 挑戰代碼錯誤，請詢問老師');
+                        const codeEl = document.getElementById('login-code');
+                        codeEl.focus();
+                        codeEl.select();
+                        return;
+                    } else {
+                        currentConfig = getDefaultParams();
+                        showToast(`ℹ️ 公開榜 [00000] 採用預設「九九乘法特訓」開局！`);
+                        showScreen('game-screen');
+                        startGameFlow();
+                    }
+                }
+            } catch (err) {
+                const modal = document.getElementById('conn-error-modal');
+                const noteEl = document.getElementById('conn-error-note');
+                const offlineBtn = document.getElementById('btn-offline-play');
+                if (codeInput !== "00000") {
+                    noteEl.innerText = `⛔ 您輸入的是班級專屬代碼 [${codeInput}]，為確保題庫正確，請依上方 2 步排除後再試！`;
+                    offlineBtn.style.display = 'none';
+                } else {
+                    noteEl.innerText = `💡 您目前選擇公開挑戰榜 [00000]，可依上方 2 步排除，或先進行單機離線練習：`;
+                    offlineBtn.style.display = 'block';
+                }
+                modal.style.display = 'flex';
+            } finally {
+                startBtn.classList.remove('disabled');
+                startBtn.innerText = playMode === 'relay' ? '▶️ 第一位同學出發！' : '▶️ 載入心算任務並發射升空';
+            }
+        }
+
+        function openHomeLeaderboard() {
+            const code = (document.getElementById('login-code').value.trim() || "00000").padStart(5, '0');
+            document.getElementById('modal-query-code').value = code;
+            document.getElementById('home-board-modal').style.display = 'flex';
+            fetchModalLeaderboard();
+        }
+        async function fetchModalLeaderboard() {
+            const code = (document.getElementById('modal-query-code').value.trim() || "00000").padStart(5, '0');
+            document.getElementById('modal-query-code').value = code;
+            const statusEl = document.getElementById('modal-board-status'), tbody = document.getElementById('modal-board-tbody');
+            statusEl.innerText = `☁️ 正在載入代碼 [${code}] 排行榜...`;
+            tbody.innerHTML = `<tr><td colspan="9" style="padding:20px;">載入中...</td></tr>`;
+            try {
+                const res = await fetch(`${getGasUrl()}?action=getLeaderboard&roomCode=${encodeURIComponent(code)}&t=${Date.now()}`, {
+                    method: 'GET', credentials: 'omit', redirect: 'follow'
+                });
+                const data = await res.json();
+                if (data && data.status === 'success') {
+                    const unpackedList = (data.leaderboard || []).map(unpackLogRecord);
+                    statusEl.innerText = `🏆 代碼 [${code}] 榮譽榜（共 ${unpackedList.length} 人）`;
+                    renderLeaderboardRows(tbody, unpackedList, document.getElementById('login-seat').value.trim() || "-", document.getElementById('login-name').value.trim());
+                } else statusEl.innerText = "❌ 讀取失敗";
+            } catch (e) { statusEl.innerText = "❌ 連線失敗"; }
+        }
+        function renderLeaderboardRows(tbody, list, mySeat, myName) {
+            if (!list || list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="padding:20px; color:#7f8c8d;">目前此代碼還沒有人上榜，快來當第一名！</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = list.map((rawItem, idx) => {
+                const item = unpackLogRecord(rawItem);
+                const isMe = (mySeat !== undefined && String(item.seatNo) === String(mySeat) && String(item.playerName) === String(myName));
+                const medal = idx === 0 ? '🥇 1' : (idx === 1 ? '🥈 2' : (idx === 2 ? '🥉 3' : (idx + 1)));
+                const shortTime = (item.timestamp || '').substring(5, 16);
+                return `<tr class="${isMe ? 'highlight-me' : ''}">
+                    <td>${medal}</td><td>${escapeHtml(item.seatNo)}</td><td>${escapeHtml(item.playerName)}</td>
+                    <td style="color:#e74c3c; font-weight:900; font-size:16px;">${item.score}</td>
+                    <td><span style="color:#27ae60;">${item.correctCount}</span>/<span style="color:#c0392b;">${item.wrongCount}</span></td>
+                    <td>🔥 ${item.maxCombo || 0}</td><td style="font-size:12px;">${escapeHtml(item.rankTitle || '')}</td>
+                    <td>${item.attempts || 1} 次</td><td style="font-size:12px; color:#666;">${escapeHtml(shortTime)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        const canvas = document.getElementById('game-canvas'), ctx = canvas.getContext('2d');
+        let timerId = null, animId = null, isGameRunning = false, hasEnded = false, isPaused = false;
+        let timeLeft = 300, timeUsed = 0, score = 0, targetScore = 100, correctCount = 0, wrongCount = 0;
+        let combo = 0, maxCombo = 0, comboForSkill = 0, freezeSkillCount = 1, doubleSkillCount = 1;
+        let freezeTimer = 0, doubleScoreTimer = 0, jamTimer = 0, screenShake = 0, radarPulse = 0;
+        let inputBuffer = "", wrongLogList = [];
+        // v2.0：開場倒數、結束橫幅、固定時間步長、模糊答案延遲擊發、唸題
+        const INTRO_MS = 2400;
+        let introEndAt = 0, endBanner = null, lastFrameTs = 0, physAccMs = 0;
+        let autoFireTimer = 0, meteorSeq = 0, lastSpokenMeteorId = -1, endTapAt = 0;
+        function isIntroRunning() { return Date.now() < introEndAt; }
+        function isInputLocked() { return !isGameRunning || isPaused || isIntroRunning() || !!endBanner; }
+        function finishWithBanner(text, sub, reason) {
+            if (endBanner || hasEnded) return;
+            endBanner = { text: text, sub: sub || '', until: Date.now() + 1500, reason: reason };
+            inputBuffer = ""; updateAnswerScreen();
+            playSound(reason === 'goal' ? 'powerup' : 'timeup');
+        }
+        function speakMathText(q) {
+            return String(q).replace(/□/g, '多少').replace(/×/g, '乘').replace(/÷/g, '除以').replace(/\+/g, '加')
+                .replace(/(\d)\s*-\s*/g, '$1減').replace(/=\s*小數\?/g, '等於多少小數').replace(/餘\?/g, '餘數是多少')
+                .replace(/(\d+)²/g, '$1的平方').replace(/=\s*\?/g, '').replace(/=/g, '等於').replace(/(\d+)\/(\d+)/g, '$2分之$1');
+        }
+
+        const turretTiers = [
+            { minPct: 0, emoji: '🔫', title: '🔫 能量守衛塔', color: '#00d2ff' },
+            { minPct: 0.25, emoji: '🛸', title: '🛸 雙管脈衝砲', color: '#00ffcc' },
+            { minPct: 0.50, emoji: '🚀', title: '🚀 離子殲滅艦', color: '#f1c40f' },
+            { minPct: 0.75, emoji: '🤖', title: '🤖 銀河機甲神', color: '#ff9ff3' },
+            { minPct: 1.0, emoji: '🌟', title: '🌟 超新星主宰', color: '#ff4757' }
+        ];
+        let currentTurretIdx = 0, turretAngle = -Math.PI / 2;
+        let meteors = [], lasers = [], particles = [], floatingTexts = [], stars = [], spawnCooldown = 0;
+        const monsterEmojis = ['👾', '👽', '☄️', '🛸', '🐙', '🤖'];
+
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playSound(type) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime, osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === 'key') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(720, now);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'laser') {
+                osc.type = 'sawtooth'; let base = Math.min(520 + combo * 45, 1100);
+                osc.frequency.setValueAtTime(base * 1.5, now); osc.frequency.exponentialRampToValueAtTime(220, now + 0.22);
+                gain.gain.setValueAtTime(0.32, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                osc.start(now); osc.stop(now + 0.22);
+            } else if (type === 'wrong') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(150, now); osc.frequency.setValueAtTime(110, now + 0.18);
+                gain.gain.setValueAtTime(0.35, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
+                osc.start(now); osc.stop(now + 0.38);
+            } else if (type === 'tick') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(880, now);
+                gain.gain.setValueAtTime(0.12, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+                osc.start(now); osc.stop(now + 0.06);
+            } else if (type === 'alarm') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(988, now); osc.frequency.setValueAtTime(740, now + 0.09);
+                gain.gain.setValueAtTime(0.13, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                osc.start(now); osc.stop(now + 0.18);
+            } else if (type === 'timeup') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(440, now); osc.frequency.exponentialRampToValueAtTime(160, now + 0.6);
+                gain.gain.setValueAtTime(0.22, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.start(now); osc.stop(now + 0.6);
+            } else if (type === 'combo') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(660, now); osc.frequency.setValueAtTime(880, now + 0.07); osc.frequency.setValueAtTime(1320, now + 0.14);
+                gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'powerup') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now + 0.08);
+                osc.frequency.setValueAtTime(784, now + 0.16); osc.frequency.setValueAtTime(1046, now + 0.24);
+                gain.gain.setValueAtTime(0.35, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.42);
+                osc.start(now); osc.stop(now + 0.42);
+            }
+        }
+        function speakText(text, interrupt = true) {
+            if (!currentConfig.enableVoice || !('speechSynthesis' in window)) return;
+            try {
+                if (interrupt) window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'zh-TW'; utter.rate = 1.25;
+                window.speechSynthesis.speak(utter);
+            } catch (e) {}
+        }
+        function toggleVoiceInGame() {
+            currentConfig.enableVoice = !currentConfig.enableVoice;
+            document.getElementById('voice-toggle-btn').innerText = currentConfig.enableVoice ? '🔊' : '🔇';
+            refocusGame();
+        }
+        let VW = 800, VH = 500;
+        function resizeCanvas() {
+            const c = document.getElementById('canvas-container');
+            const w = Math.max(1, c.clientWidth), h = Math.max(1, c.clientHeight);
+            const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+            const oldW = VW, oldH = VH;
+            VW = w; VH = h;
+            canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            // 畫面大小改變時，算式怪獸跟著縮放位置，不會跑到畫面外
+            if (oldW > 1 && oldH > 1 && typeof meteors !== 'undefined') {
+                meteors.forEach(m => { m.x = Math.max(m.w / 2 + 6, Math.min(w - m.w / 2 - 6, m.x * w / oldW)); m.y = m.y * h / oldH; });
+                stars.forEach(st => { st.x = st.x * w / oldW; st.y = st.y * h / oldH; });
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function startGameFlow() {
+            initAudio(); resizeCanvas();
+            if (timerId) clearInterval(timerId);
+            if (animId) cancelAnimationFrame(animId);
+            isGameRunning = true; hasEnded = false; isPaused = false;
+            introEndAt = Date.now() + INTRO_MS; endBanner = null; lastFrameTs = 0; physAccMs = 0;
+            autoFireTimer = 0; lastSpokenMeteorId = -1; endTapAt = 0;
+            document.getElementById('hud').classList.remove('urgent');
+            document.getElementById('answer-screen').classList.remove('jammed');
+            timeLeft = Number(currentConfig.time) || 300; timeUsed = 0;
+            targetScore = Number(currentConfig.targetScore) || 100;
+            score = 0; correctCount = 0; wrongCount = 0;
+            combo = 0; maxCombo = 0; comboForSkill = 0;
+            freezeSkillCount = 1; doubleSkillCount = 1;
+            freezeTimer = 0; doubleScoreTimer = 0; jamTimer = 0; screenShake = 0;
+            inputBuffer = ""; wrongLogList = []; currentTurretIdx = 0; turretAngle = -Math.PI / 2;
+            meteors = []; lasers = []; particles = []; floatingTexts = []; spawnCooldown = 10;
+
+            stars = [];
+            for (let i = 0; i < 45; i++) stars.push({ x: Math.random() * VW, y: Math.random() * VH, r: Math.random() * 2 + 0.5, s: Math.random() * 0.4 + 0.1 });
+
+            document.getElementById('pause-btn').style.display = currentConfig.allowPause ? 'flex' : 'none';
+            document.getElementById('end-btn').style.display = 'flex';
+            document.getElementById('voice-toggle-btn').innerText = currentConfig.enableVoice ? '🔊' : '🔇';
+            document.getElementById('penalty-warning').style.display = 'none';
+            document.getElementById('pause-overlay').style.display = 'none';
+            document.getElementById('hud').classList.remove('double-fever');
+            document.getElementById('target-display').innerText = targetScore;
+
+            updateAnswerScreen(); updateHUD(); spawnMeteor();
+
+            timerId = setInterval(() => {
+                if (!isGameRunning || isPaused || isIntroRunning() || endBanner) return;
+                timeLeft--; timeUsed++; updateHUD();
+                document.getElementById('hud').classList.toggle('urgent', timeLeft <= 10);
+                if (timeLeft <= 10 && timeLeft > 0) playSound(timeLeft <= 5 ? 'alarm' : 'tick');   // 🔇 不念數字，只用滴答聲
+                if (timeLeft <= 0) finishWithBanner('⏰ 時間到！', '看看你守住了多少分', 'timeup');
+            }, 1000);
+            animId = requestAnimationFrame(gameLoop);
+        }
+
+        function pressNum(char, ev) {
+            if (ev) ev.preventDefault();
+            if (isInputLocked() || jamTimer > 0) return;
+            initAudio();
+            if (char === '.' && inputBuffer.includes('.')) return;
+            if (inputBuffer.length >= 7) return;
+            if (char === '.' && inputBuffer === '') inputBuffer = '0';   // 「.5」自動當成「0.5」
+            inputBuffer += char; playSound('key'); highlightKeyBtn(char); updateAnswerScreen();
+            if (currentConfig.inputMode === 'auto') checkAutoHitWithAntiCheat();
+        }
+        function pressBackspace(ev) {
+            if (ev) ev.preventDefault();
+            if (isInputLocked() || jamTimer > 0) return;
+            inputBuffer = ""; autoFireTimer = 0; playSound('key'); highlightKeyBtn('Backspace'); updateAnswerScreen();
+        }
+        function requestEndGame() {
+            if (!isGameRunning || hasEnded || endBanner) return;
+            if (Date.now() - endTapAt < 2500) { endTapAt = 0; isPaused = false; document.getElementById('pause-overlay').style.display = 'none'; endGame('manual'); return; }
+            endTapAt = Date.now();
+            showToast('🏁 再按一次「🏁」就結束並結算成績');
+            refocusGame();
+        }
+        function triggerWrongPenalty(reasonText) {
+            wrongCount++; combo = 0; score = Math.max(0, score - 5);
+            const targetM = getLowestMeteor();
+            if (targetM && wrongLogList.length < 12) {
+                wrongLogList.push(`${targetM.q}(誤答${inputBuffer})`);
+                targetM.showHint = true;
+            }
+            inputBuffer = ""; autoFireTimer = 0; jamTimer = 90; playSound('wrong');
+            if (targetM) floatingTexts.push({ x: targetM.x, y: targetM.y - targetM.h / 2 - 6, text: '❌ -5', color: '#ff7675', life: 45, maxLife: 45 });
+            document.getElementById('answer-screen').classList.add('jammed');
+            document.getElementById('penalty-warning').innerHTML = `⚠️ ${reasonText}<br><span style="font-size:15px;">扣 5 分、冷卻 1.5 秒，看看算式下方的💡思考提示！</span>`;
+            document.getElementById('penalty-warning').style.display = 'block';
+            updateAnswerScreen(); updateHUD();
+        }
+        function pressFire(ev) {
+            if (ev) ev.preventDefault();
+            if (isInputLocked() || jamTimer > 0 || !inputBuffer) return;
+            highlightKeyBtn('Enter');
+            if (currentConfig.inputMode === 'auto' && autoFireTimer > 0) { resolveAutoFire(true); return; }
+            const matched = findMatchingMeteor(inputBuffer, true);
+            if (matched) { destroyMeteor(matched); inputBuffer = ""; updateAnswerScreen(); }
+            else triggerWrongPenalty("發射答案不正確！");
+        }
+        function checkAutoHitWithAntiCheat() {
+            autoFireTimer = 0;
+            const matched = findMatchingMeteor(inputBuffer, false);
+            // 打的數字剛好是某題答案、但也是另一題較長答案的開頭（例如場上有 1 和 12）→ 等 0.8 秒看還要不要繼續打
+            const longer = meteors.some(m => m !== matched && String(m.a).length > inputBuffer.length && String(m.a).startsWith(inputBuffer));
+            if (matched && !longer) { resolveAutoFire(true); return; }
+            if (matched && longer) { autoFireTimer = 48; updateAnswerScreen(); return; }
+            if (meteors.length > 0 && !meteors.some(m => String(m.a).startsWith(inputBuffer))) {
+                triggerWrongPenalty("輸入數字與場上算式不符！");
+            }
+        }
+        function resolveAutoFire(fire) {
+            autoFireTimer = 0;
+            if (!fire || !inputBuffer) return;
+            const matched = findMatchingMeteor(inputBuffer, false);
+            if (matched) { destroyMeteor(matched); inputBuffer = ""; updateAnswerScreen(); }
+        }
+        function findMatchingMeteor(ansStr, numeric) {
+            let best = null;
+            const n = Number(ansStr);
+            for (let m of meteors) {
+                const ok = numeric ? (ansStr !== '' && isFinite(n) && Math.abs(Number(m.a) - n) < 1e-9) : (String(m.a) === ansStr);
+                if (ok && (!best || m.y > best.y)) best = m;
+            }
+            return best;
+        }
+        function getLowestMeteor() {
+            return meteors.length ? meteors.reduce((low, m) => (!low || m.y > low.y) ? m : low, null) : null;
+        }
+
+        function destroyMeteor(m) {
+            const tx = VW / 2, ty = VH - 32;
+            turretAngle = Math.atan2(m.y - ty, m.x - tx);
+            combo++; if (combo > maxCombo) maxCombo = combo;
+            correctCount++; comboForSkill++;
+            let basePts = combo >= 5 ? 15 : (combo >= 2 ? 12 : 10);
+            if (doubleScoreTimer > 0) basePts *= 2;
+            score += basePts;
+
+            if (m.itemType === 'freeze') {
+                freezeTimer = Math.max(freezeTimer, 420);
+                floatingTexts.push({ x: m.x, y: m.y, text: `❄️ 極凍慢動作 +${basePts}`, color: '#00d2ff', life: 55, maxLife: 55 });
+            } else if (m.itemType === 'double') {
+                doubleScoreTimer = Math.max(doubleScoreTimer, 480);
+                document.getElementById('hud').classList.add('double-fever');
+                floatingTexts.push({ x: m.x, y: m.y, text: `🔥 雙倍狂熱 +${basePts}`, color: '#f1c40f', life: 55, maxLife: 55 });
+            } else {
+                let txt = doubleScoreTimer > 0 ? `🔥雙倍 +${basePts}!` : (combo >= 3 ? `+${basePts} (Combo x${combo})` : `+${basePts}`);
+                floatingTexts.push({ x: m.x, y: m.y, text: txt, color: doubleScoreTimer > 0 ? '#f1c40f' : '#00ffcc', life: 45, maxLife: 45 });
+            }
+
+            if (comboForSkill >= 4) {
+                freezeSkillCount++; doubleSkillCount++; comboForSkill = 0; playSound('powerup');
+                floatingTexts.push({ x: tx, y: ty - 60, text: '🎁 連擊獎勵：獲得 ❄️冰封提示 ＆ 🔥雙倍分！', color: '#f1c40f', life: 65, maxLife: 65 });
+            }
+
+            lasers.push({ x1: tx, y1: ty, x2: m.x, y2: m.y, color: turretTiers[currentTurretIdx].color, life: 14, maxLife: 14 });
+            spawnExplosion(m.x, m.y, [turretTiers[currentTurretIdx].color, '#f1c40f', '#ffffff'], 24);
+            playSound('laser'); screenShake = 5;
+            const idx = meteors.indexOf(m);
+            if (idx !== -1) meteors.splice(idx, 1);
+
+            checkTurretEvolution(); updateHUD();
+            if (combo >= 3 && combo % 3 === 0) playSound('combo');
+            if (score >= targetScore) { finishWithBanner('🎉 任務達成！', `${score} / ${targetScore} 分，星球守住了！`, 'goal'); return; }
+            if (meteors.length === 0) spawnMeteor();
+        }
+
+        function activateFreezeHint(ev) {
+            if (ev) ev.preventDefault();
+            if (isInputLocked() || freezeSkillCount <= 0) return;
+            initAudio(); freezeSkillCount--; freezeTimer = 480;
+            meteors.forEach(m => { m.showHint = true; });
+            playSound('powerup');
+            floatingTexts.push({ x: VW / 2, y: VH / 2, text: '❄️ 時空凝結 8 秒 ＋ 💡 思考策略提示！', color: '#00d2ff', life: 65, maxLife: 65 });
+            updateHUD();
+        }
+        function activateDoubleScore(ev) {
+            if (ev) ev.preventDefault();
+            if (isInputLocked() || doubleSkillCount <= 0) return;
+            initAudio(); doubleSkillCount--; doubleScoreTimer = 600;
+            document.getElementById('hud').classList.add('double-fever');
+            playSound('powerup');
+            floatingTexts.push({ x: VW / 2, y: VH / 2, text: '🔥 黃金狂熱 10 秒：算對得分 × 2 倍！', color: '#f1c40f', life: 65, maxLife: 65 });
+            updateHUD();
+        }
+        function checkTurretEvolution() {
+            const pct = score / Math.max(1, targetScore);
+            let newIdx = 0;
+            for (let i = turretTiers.length - 1; i >= 0; i--) { if (pct >= turretTiers[i].minPct) { newIdx = i; break; } }
+            if (newIdx > currentTurretIdx) {
+                currentTurretIdx = newIdx;
+                floatingTexts.push({ x: VW / 2, y: VH - 90, text: `🆙 武裝升級：${turretTiers[currentTurretIdx].title}`, color: '#f1c40f', life: 65, maxLife: 65 });
+            }
+            document.getElementById('rank-display').innerText = turretTiers[currentTurretIdx].title;
+        }
+
+        function calculateMeteorSpeed(spdLevel) {
+            const s = Number(spdLevel) || 2;
+            if (s >= 9) return (s * 0.22 + 0.25) + Math.random() * 0.18;
+            return ((s * 0.22 + 0.25) / 4) + Math.random() * 0.03;
+        }
+
+        function meteorScale() { return Math.max(0.6, Math.min(1, VH / 480, VW / 640)); }
+        function spawnMeteor() {
+            if (!isGameRunning) return;
+            const maxAllowed = Number(currentConfig.maxMeteors) || 2;
+            if (meteors.length >= maxAllowed) return;
+            const qa = generateMathQuestion(currentConfig, score), hintStr = buildScaffoldHint(qa.q);
+            const sc = meteorScale();
+            ctx.font = `900 ${Math.round(28 * sc)}px "Segoe UI", Arial`;
+            const w = Math.max(135 * sc, ctx.measureText(qa.q).width + 46 * sc), h = 82 * sc;
+            let x = VW / 2;
+            for (let t = 0; t < 12; t++) {
+                let cand = randInt(Math.ceil(w / 2 + 24), Math.floor(VW - w / 2 - 24));
+                if (!meteors.some(m => m.y < 180 && Math.abs(m.x - cand) < (m.w / 2 + w / 2 + 28))) { x = cand; break; }
+            }
+            let itemType = "", emoji = pickRandom(monsterEmojis);
+            if (Math.random() < 0.14) { itemType = Math.random() < 0.55 ? "freeze" : "double"; emoji = itemType === "freeze" ? "❄️" : "🔥"; }
+            const rawVy = calculateMeteorSpeed(currentConfig.speed);
+            const adaptiveMult = (currentConfig.adaptive ? Math.min(1.25, 1 + score / 500) : 1);
+            meteors.push({ id: ++meteorSeq, sc: sc, x: x, y: h / 2 + 30 * sc, w: w, h: h, q: qa.q, a: qa.a, hint: hintStr, showHint: false, emoji: emoji, itemType: itemType, vy: rawVy * adaptiveMult });
+        }
+
+        function spawnExplosion(x, y, colors, count = 24) {
+            for (let i = 0; i < count; i++) {
+                const ang = Math.random() * Math.PI * 2, spd = Math.random() * 7 + 2;
+                particles.push({ x: x, y: y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, r: Math.random() * 5 + 2, color: pickRandom(colors), life: 30, maxLife: 30 });
+            }
+        }
+
+        function updatePhysics() {
+            if (!isGameRunning) return;
+            radarPulse = (radarPulse + 0.08) % (Math.PI * 2);
+            stars.forEach(st => { st.y = (st.y + st.s) % Math.max(1, VH); });
+            if (autoFireTimer > 0) { autoFireTimer--; if (autoFireTimer === 0) resolveAutoFire(true); }
+            if (freezeTimer > 0) freezeTimer--;
+            if (doubleScoreTimer > 0) { doubleScoreTimer--; if (doubleScoreTimer === 0) document.getElementById('hud').classList.remove('double-fever'); }
+            if (jamTimer > 0) {
+                jamTimer--;
+                if (jamTimer === 0) {
+                    document.getElementById('answer-screen').classList.remove('jammed');
+                    document.getElementById('penalty-warning').style.display = 'none';
+                    updateAnswerScreen();
+                }
+            }
+            if (screenShake > 0) screenShake--;
+
+            spawnCooldown--;
+            if (spawnCooldown <= 0) {
+                spawnMeteor();
+                const s = Number(currentConfig.speed) || 2;
+                spawnCooldown = s >= 9 ? Math.max(45, 140 - s * 9) : Math.max(180, 420 - s * 28);
+            }
+
+            const spdFactor = freezeTimer > 0 ? 0.25 : 1, defenseLineY = VH - 54;
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const m = meteors[i];
+                m.y += m.vy * spdFactor;
+                if (m.y + m.h / 2 >= defenseLineY) {
+                    combo = 0; wrongCount++;
+                    if (wrongLogList.length < 12) wrongLogList.push(`${m.q}(逾時重修)`);
+                    m.y = m.h / 2 + 30 * (m.sc || 1); m.vy = Math.max(0.08, m.vy * 0.8); m.showHint = true;
+                    floatingTexts.push({ x: m.x, y: defenseLineY - 25, text: `🔄 減速重修！請看下方策略提示`, color: '#f1c40f', life: 60, maxLife: 60 });
+                    updateHUD();
+                }
+            }
+            { const pm = getLowestMeteor(); if (pm && pm.id !== lastSpokenMeteorId) { lastSpokenMeteorId = pm.id; speakText(speakMathText(pm.q), true); } }
+            for (let i = lasers.length - 1; i >= 0; i--) { lasers[i].life--; if (lasers[i].life <= 0) lasers.splice(i, 1); }
+            for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--; if (p.life <= 0) particles.splice(i, 1); }
+            for (let i = floatingTexts.length - 1; i >= 0; i--) { let ft = floatingTexts[i]; ft.y -= 1.5; ft.life--; if (ft.life <= 0) floatingTexts.splice(i, 1); }
+        }
+
+        function drawScene() {
+            if (!isGameRunning) return;
+            ctx.save();
+            if (screenShake > 0) ctx.translate((Math.random() - 0.5) * screenShake * 1.3, (Math.random() - 0.5) * screenShake * 1.3);
+            ctx.clearRect(0, 0, VW, VH);
+
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(st => { ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2); ctx.fill(); });
+
+            if (freezeTimer > 0) { ctx.fillStyle = 'rgba(0, 210, 255, 0.14)'; ctx.fillRect(0, 0, VW, VH); }
+            else if (doubleScoreTimer > 0) { ctx.fillStyle = 'rgba(241, 196, 15, 0.1)'; ctx.fillRect(0, 0, VW, VH); }
+
+            const defenseLineY = VH - 54;
+            ctx.strokeStyle = '#00d2ff'; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
+            ctx.beginPath(); ctx.moveTo(0, defenseLineY); ctx.lineTo(VW, defenseLineY); ctx.stroke(); ctx.setLineDash([]);
+
+            lasers.forEach(ls => {
+                ctx.save(); ctx.globalAlpha = ls.life / ls.maxLife;
+                ctx.strokeStyle = ls.color; ctx.lineWidth = 9; ctx.shadowColor = ls.color; ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.moveTo(ls.x1, ls.y1); ctx.lineTo(ls.x2, ls.y2); ctx.stroke();
+                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+            });
+
+            const lowestM = getLowestMeteor();
+            meteors.forEach(m => {
+                ctx.save();
+                const isPrimary = (m === lowestM);
+                if (isPrimary) {
+                    const pad = 8 + Math.sin(radarPulse) * 3;
+                    ctx.strokeStyle = '#ff4757'; ctx.lineWidth = 3; ctx.setLineDash([10, 6]);
+                    ctx.strokeRect(m.x - m.w / 2 - pad, m.y - m.h / 2 - pad, m.w + pad * 2, m.h + pad * 2);
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#ff4757'; ctx.font = '900 13px "Microsoft JhengHei", Arial'; ctx.textAlign = 'center';
+                    ctx.fillText('🎯 優先鎖定目標', m.x, m.y - m.h / 2 - pad - 8);
+                }
+                ctx.lineWidth = 4;
+                if (m.itemType === 'freeze') { ctx.strokeStyle = '#00d2ff'; ctx.fillStyle = '#e0f7fa'; }
+                else if (m.itemType === 'double') { ctx.strokeStyle = '#f39c12'; ctx.fillStyle = '#fef9e7'; }
+                else if (isPrimary) { ctx.strokeStyle = '#ff6b81'; ctx.fillStyle = '#ffffff'; }
+                else { ctx.strokeStyle = '#f1c40f'; ctx.fillStyle = '#ffffff'; }
+                ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = isPrimary ? 18 : 8;
+                ctx.beginPath(); ctx.roundRect(m.x - m.w / 2, m.y - m.h / 2, m.w, m.h, 18); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+
+                const msc = m.sc || 1;
+                ctx.font = `${Math.round(25 * msc)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(m.emoji, m.x, m.y - 18 * msc);
+                ctx.fillStyle = '#1e272e'; ctx.font = `900 ${Math.round(28 * msc)}px "Segoe UI", Arial`;
+                ctx.fillText(m.q, m.x, m.y + 15 * msc);
+
+                if (m.showHint && m.hint) {
+                    ctx.font = 'bold 14px "Microsoft JhengHei", Arial';
+                    const hintW = Math.max(m.w + 20, ctx.measureText(m.hint).width + 24);
+                    ctx.fillStyle = 'rgba(15, 32, 39, 0.94)'; ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.roundRect(m.x - hintW / 2, m.y + m.h / 2 + 8, hintW, 28, 8); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#00ffcc'; ctx.fillText(m.hint, m.x, m.y + m.h / 2 + 22);
+                }
+                ctx.restore();
+            });
+
+            const tx = VW / 2, ty = VH - 28;
+            ctx.save(); ctx.translate(tx, ty);
+            ctx.fillStyle = 'rgba(0, 210, 255, 0.25)'; ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.fill();
+            ctx.rotate(turretAngle + Math.PI / 2);
+            ctx.font = '38px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(turretTiers[currentTurretIdx].emoji, 0, 0); ctx.restore();
+
+            particles.forEach(p => {
+                ctx.save(); ctx.globalAlpha = p.life / p.maxLife; ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            });
+            floatingTexts.forEach(ft => {
+                ctx.save(); ctx.globalAlpha = ft.life / ft.maxLife;
+                ctx.font = '900 25px "Microsoft JhengHei", Arial'; ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillStyle = ft.color; ctx.fillText(ft.text, ft.x, ft.y); ctx.restore();
+            });
+            ctx.restore();
+        }
+
+        function gameLoop(ts) {
+            if (!isGameRunning) return;
+            const now = (typeof ts === 'number') ? ts : performance.now();
+            if (!lastFrameTs) lastFrameTs = now;
+            let dt = now - lastFrameTs; lastFrameTs = now;
+            if (dt > 250) dt = 250;   // 切到背景再回來：不要一次補跑太多
+            if (!isPaused) {
+                if (endBanner) {
+                    if (Date.now() >= endBanner.until) { const r = endBanner.reason; endBanner = null; endGame(r); return; }
+                } else if (!isIntroRunning()) {
+                    physAccMs += dt;
+                    let steps = 0;
+                    while (physAccMs >= 1000 / 60 && steps < 8) { updatePhysics(); physAccMs -= 1000 / 60; steps++; if (!isGameRunning || endBanner) break; }
+                    if (!isGameRunning) return;
+                } else { physAccMs = 0; }
+                drawScene();
+                drawIntroAndBanner();
+            }
+            animId = requestAnimationFrame(gameLoop);
+        }
+        function drawIntroAndBanner() {
+            const nowMs = Date.now();
+            if (isIntroRunning()) {
+                const left = introEndAt - nowMs;
+                const n = Math.ceil(left / 800);
+                const t = 1 - ((left % 800) / 800);
+                ctx.save();
+                ctx.fillStyle = 'rgba(7, 11, 25, 0.55)'; ctx.fillRect(0, 0, VW, VH);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.font = `bold ${Math.min(VW, VH) * 0.07}px "Microsoft JhengHei", Arial`;
+                ctx.fillStyle = '#00ffcc';
+                ctx.fillText(currentConfig.title || '心算特訓', VW / 2, VH * 0.3);
+                ctx.globalAlpha = Math.max(0, 1 - t * 0.6);
+                ctx.font = `900 ${Math.min(VW, VH) * (0.22 + t * 0.08)}px "Segoe UI", Arial`;
+                ctx.fillStyle = '#f1c40f'; ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
+                ctx.strokeText(String(n), VW / 2, VH * 0.58); ctx.fillText(String(n), VW / 2, VH * 0.58);
+                ctx.restore();
+                if (n !== drawIntroAndBanner.lastN) { drawIntroAndBanner.lastN = n; playSound('tick'); }
+            } else drawIntroAndBanner.lastN = 0;
+            if (endBanner) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(7, 11, 25, 0.6)'; ctx.fillRect(0, 0, VW, VH);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.font = `900 ${Math.min(VW * 0.1, VH * 0.16)}px "Microsoft JhengHei", Arial`;
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 7; ctx.fillStyle = endBanner.reason === 'goal' ? '#f1c40f' : '#ff7675';
+                ctx.strokeText(endBanner.text, VW / 2, VH * 0.44); ctx.fillText(endBanner.text, VW / 2, VH * 0.44);
+                if (endBanner.sub) {
+                    ctx.font = `bold ${Math.min(VW * 0.045, VH * 0.07)}px "Microsoft JhengHei", Arial`;
+                    ctx.fillStyle = '#fff'; ctx.lineWidth = 4;
+                    ctx.strokeText(endBanner.sub, VW / 2, VH * 0.6); ctx.fillText(endBanner.sub, VW / 2, VH * 0.6);
+                }
+                ctx.restore();
+            }
+        }
+        function updateAnswerScreen() {
+            const el = document.getElementById('answer-screen');
+            if (jamTimer > 0) { el.innerText = "⚡冷卻鎖定"; return; }
+            if (autoFireTimer > 0 && inputBuffer) { el.innerText = inputBuffer + " …"; return; }
+            el.innerText = inputBuffer ? inputBuffer : (currentConfig.inputMode === 'auto' ? "⚡秒殺瞄準" : "🔒輸入發射");
+        }
+        function updateHUD() {
+            document.getElementById('time-display').innerText = timeLeft;
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('freeze-count').innerText = freezeSkillCount;
+            document.getElementById('double-count').innerText = doubleSkillCount;
+            document.getElementById('progress-bar-fill').style.width = Math.min(100, Math.round((score / Math.max(1, targetScore)) * 100)) + "%";
+            const comboBadge = document.getElementById('combo-badge');
+            if (combo >= 2) { comboBadge.style.display = 'inline-block'; comboBadge.innerText = `🔥 COMBO x${combo}`; }
+            else comboBadge.style.display = 'none';
+            document.getElementById('freeze-badge').classList.toggle('active', freezeSkillCount > 0);
+            document.getElementById('double-badge').classList.toggle('active', doubleSkillCount > 0);
+        }
+        function highlightKeyBtn(keyStr) {
+            const btn = document.querySelector(`.num-btn[data-key="${keyStr}"]`);
+            if (btn) { btn.classList.add('key-pressed'); setTimeout(() => btn.classList.remove('key-pressed'), 120); }
+        }
+
+        window.addEventListener('keydown', function(e) {
+            if (!isGameRunning || !document.getElementById('game-screen').classList.contains('active')) return;
+            if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pressNum(e.key); }
+            else if (e.key === '.') { e.preventDefault(); pressNum('.'); }
+            else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Escape') { e.preventDefault(); pressBackspace(); }
+            else if (e.key === 'Enter') { e.preventDefault(); pressFire(); }
+            else if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); activateFreezeHint(); }
+            else if (e.key === 'Shift' && !e.repeat) { e.preventDefault(); activateDoubleScore(); }
+        }, { passive: false });
+
+        function togglePause() {
+            if (!currentConfig.allowPause || !isGameRunning) return;
+            isPaused = !isPaused;
+            document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none';
+            refocusGame();
+        }
+        function resumeGame() { isPaused = false; document.getElementById('pause-overlay').style.display = 'none'; refocusGame(); }
+        function restartGame() { document.getElementById('relay-next-modal').style.display = 'none'; showScreen('game-screen'); startGameFlow(); }
+        function backToHome() {
+            isGameRunning = false;
+            if (timerId) clearInterval(timerId);
+            if (animId) cancelAnimationFrame(animId);
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            showScreen('home-screen');
+        }
+        function backToHomeFromGame() { backToHome(); }
+
+        function endGame(reason) {
+            const isGoalReached = (reason === true || reason === 'goal');
+            if (hasEnded) return;
+            endBanner = null;
+            hasEnded = true; isGameRunning = false;
+            if (timerId) { clearInterval(timerId); timerId = null; }
+            if (animId) { cancelAnimationFrame(animId); animId = null; }
+            meteors = [];
+
+            const totalTime = Number(currentConfig.time) || 300;
+            const totalAttempts = correctCount + wrongCount;
+            const accuracy = totalAttempts > 0 ? (correctCount / totalAttempts) : 1;
+            let speedBonus = 0, accuracyBonus = 0;
+
+            if (isGoalReached) {
+                const timeRatio = Math.max(0, timeLeft / totalTime);
+                speedBonus = Math.round(timeRatio * 30 * (accuracy >= 0.75 ? 1 : 0.3));
+                if (wrongCount === 0 && correctCount >= 5) accuracyBonus = 20;
+                else if (accuracy >= 0.88) accuracyBonus = 10;
+            }
+            const finalTotalScore = score + speedBonus + accuracyBonus;
+            score = finalTotalScore;
+
+            document.getElementById('result-main-title').innerText = isGoalReached ? "🎉 恭喜達標過關！星際防衛任務成功！" : (reason === 'manual' ? "🏁 挑戰結束！成績已結算" : "⏰ 時間到！感謝您的認真挑戰！");
+            document.getElementById('hud').classList.remove('urgent');
+            document.getElementById('final-score').innerText = finalTotalScore;
+            document.getElementById('final-correct').innerText = correctCount;
+            document.getElementById('final-wrong').innerText = wrongCount;
+            document.getElementById('final-max-combo').innerText = maxCombo;
+            document.getElementById('final-duration').innerText = timeUsed;
+            document.getElementById('final-rank-title').innerText = '最終防衛武裝：' + turretTiers[currentTurretIdx].title;
+
+            document.getElementById('bonus-breakdown-box').innerHTML = `
+                <span>🔋 作戰得分：${finalTotalScore - speedBonus - accuracyBonus} 分</span>
+                <span>⏱️ 早鳥時間獎勵：+${speedBonus} 分</span>
+                <span>🎯 精準度獎勵 (${Math.round(accuracy * 100)}%)：+${accuracyBonus} 分</span>`;
+
+            const reviewBox = document.getElementById('wrong-review-box');
+            if (wrongLogList.length > 0) {
+                reviewBox.style.display = 'block';
+                reviewBox.innerHTML = `💡 <b>本場待加強算式溫習：</b> ${escapeHtml(wrongLogList.join(' 、 '))}`;
+            } else reviewBox.style.display = 'none';
+
+            if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+            showScreen('result-screen');
+            recordRelayResult(finalTotalScore);
+            uploadScoreAndLoadBoard();
+        }
+
+        async function uploadScoreAndLoadBoard() {
+            const statusEl = document.getElementById('result-upload-status'), tbody = document.getElementById('result-board-tbody');
+            const code = currentStudent.roomCode;
+            document.getElementById('result-board-title').innerText = `🏆 代碼 [${code}] 榮譽排行榜 (每人最高分)`;
+            tbody.innerHTML = `<tr><td colspan="9" style="padding:20px;">☁️ 正在同步成績與最新排行榜...</td></tr>`;
+            statusEl.innerText = "☁️ 成績上傳中...";
+
+            const cleanRank = turretTiers[currentTurretIdx].title;
+            const topicStr = getTopicSummaryText(currentConfig);
+            const wrongStr = wrongLogList.length ? wrongLogList.join(', ') : "全對無失誤";
+            const tunneledRankTitle = `${cleanRank}||${topicStr}||${wrongStr}`;
+
+            try {
+                const payload = {
+                    action: "submitScore", roomCode: code, seatNo: currentStudent.seatNo, playerName: currentStudent.playerName,
+                    score: score, correctCount: correctCount, wrongCount: wrongCount, maxCombo: maxCombo,
+                    durationSeconds: timeUsed, rankTitle: tunneledRankTitle, topicSummary: topicStr, wrongDetails: wrongStr
+                };
+                const res = await fetch(getGasUrl(), {
+                    method: 'POST', credentials: 'omit', redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data && data.status === 'success') {
+                    statusEl.innerText = "✅ 成績已紀錄！";
+                    renderLeaderboardRows(tbody, (data.leaderboard || []).map(unpackLogRecord), currentStudent.seatNo, currentStudent.playerName);
+                } else statusEl.innerText = "❌ 上傳失敗";
+            } catch (e) { statusEl.innerText = "❌ 連線異常"; }
+        }
+
+        function refocusGame() {
+            if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+            window.focus(); document.body.focus();
+        }
+        function showToast(msg) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = msg; toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3200);
+        }
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if (id === 'game-screen') { resizeCanvas(); setTimeout(refocusGame, 50); }
+        }
+        function escapeHtml(str) {
+            return String(str || '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+        }
+    </script>
+<script>
+        // 🔗 從「遊戲代碼公開區」點進來（網址帶 ?code=12345）：自動填入代碼並載入老師設定
+        // 🔎 管理平台「代碼查詢 → 進入遊戲後台」：網址帶 ?admin=12345
+        let pendingAdminJumpCode = null;
+        function applyAdminJumpParam() {
+            try {
+                const m = String(location.search || '').match(/[?&]admin=(\d{5})(?:&|$)/);
+                if (!m || m[1] === '00000') return;
+                pendingAdminJumpCode = m[1];
+                if (history.replaceState) history.replaceState(null, '', location.pathname + location.hash);
+                openTeacherLoginModal();
+                const card = document.querySelector('#teacher-login-modal .small-modal-card');
+                if (card) {
+                    let tip = document.getElementById('admin-jump-tip');
+                    if (!tip) {
+                        tip = document.createElement('div'); tip.id = 'admin-jump-tip';
+                        tip.style.cssText = 'background:#ede9fe; border:2px solid #8b5cf6; color:#5b21b6; border-radius:10px; padding:8px 10px; margin:0 0 12px 0; font-size:14px; font-weight:bold; line-height:1.5;';
+                        const h2 = card.querySelector('h2'); if (h2) h2.insertAdjacentElement('afterend', tip); else card.prepend(tip);
+                    }
+                    tip.innerHTML = `🔎 從管理平台進入代碼 <b style="font-size:17px; letter-spacing:2px;">${pendingAdminJumpCode}</b> 的設定後台<br><span style="font-weight:normal; font-size:12.5px;">請輸入最高管理員密碼，或這組代碼出題老師的通行碼</span>`;
+                }
+            } catch (e) {}
+        }
+        (function () {
+            const origVerify = verifyTeacherStep1;
+            verifyTeacherStep1 = async function () {
+                const r = await origVerify.apply(this, arguments);
+                const code = pendingAdminJumpCode;
+                if (code && adminSession && adminSession.teacherPass && document.getElementById('teacher-login-modal').style.display === 'none') {
+                    pendingAdminJumpCode = null;
+                    const tip = document.getElementById('admin-jump-tip'); if (tip) tip.remove();
+                    try { switchRoomModalMode('maintain'); } catch (e) {}
+                    const ci = document.getElementById('maintain-room-code-input'), pi = document.getElementById('maintain-room-pin-input');
+                    if (ci) ci.value = code;
+                    if (pi) pi.value = '';
+                    await submitMaintainRoom();   // 最高管理員或出題老師本人：免輸入代碼管理密碼；其他人會停在這裡請輸入管理密碼
+                }
+                return r;
+            };
+            if (typeof closeTeacherLoginModal === 'function') {
+                const origClose = closeTeacherLoginModal;
+                closeTeacherLoginModal = function () { pendingAdminJumpCode = null; const tip = document.getElementById('admin-jump-tip'); if (tip) tip.remove(); return origClose.apply(this, arguments); };
+            }
+            const prevOnload = window.onload;
+            window.onload = function () {
+                if (typeof prevOnload === 'function') prevOnload.apply(this, arguments);
+                setTimeout(applyAdminJumpParam, 30);
+            };
+        })();
+
+        function applyUrlCodeParam() {
+            try {
+                if (window.__TRANSFERRED_STATE__) return;
+                const m = String(location.search || '').match(/[?&]code=(\d{5})(?:&|$)/);
+                if (!m) return;
+                const el = document.getElementById('login-code');
+                if (!el) return;
+                el.value = m[1];
+                if (typeof onHomeCodeInput === 'function') onHomeCodeInput(el);
+                if (typeof showToast === 'function') showToast(`🔗 已帶入代碼 ${m[1]}，輸入名字就可以開始挑戰！`);
+                const nameEl = document.getElementById('login-name');
+                if (nameEl && !nameEl.value) { nameEl.style.boxShadow = '0 0 0 4px rgba(250,204,21,0.75)'; setTimeout(() => { nameEl.style.boxShadow = ''; }, 4000); }
+                if (history.replaceState) history.replaceState(null, '', location.pathname + location.hash);
+            } catch (e) {}
+        }
+        (function () {
+            const prevOnload = window.onload;
+            window.onload = function () {
+                if (typeof prevOnload === 'function') prevOnload.apply(this, arguments);
+                setTimeout(applyUrlCodeParam, 0);
+            };
+        })();
+    </script>
+</body>
+</html>
